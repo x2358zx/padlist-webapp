@@ -1,0 +1,126 @@
+
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PAD List Web</title>
+  <link rel="icon" href="/static/app.ico"/>
+  <link rel="stylesheet" href="/static/css/style.css"/>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="version-badge" title="PAD List 第一版: 2024/12/02&#10;新增截圖/滾輪縮放/無法連線 PIN: 2024/12/22">
+        <span class="icon">⚙</span>
+        <span>Version 1.1.0</span>
+      </div>
+      <div class="nowtime" id="nowtime"></div>
+      <div class="title">PAD List（Python Web 版）</div>
+    </header>
+
+    <main>
+      <section class="left-pane">
+        <div id="status" class="status normal">等待選擇檔案...</div>
+        <div id="error" class="status error"></div>
+
+        <div class="controls">
+          <div class="row">
+            <label class="btn file-btn">
+              1. 選擇Excel檔案
+              <input id="excelFile" type="file" accept=".xlsx" hidden />
+            </label>
+          </div>
+
+          <div class="row">
+            <label>選擇工作表：</label>
+            <select id="sheetSelector"></select>
+          </div>
+
+          <div class="row group">
+            <div class="row">
+              <label>chip size 寬度：</label>
+              <input id="chipWidth" type="text" />
+            </div>
+            <div class="row">
+              <label>chip size 高度：</label>
+              <input id="chipHeight" type="text" />
+            </div>
+          </div>
+
+          <div class="row">
+            <button id="loadDataBtn">2. 載入資料</button>
+          </div>
+        </div>
+
+        <div class="coord-controls">
+		<!--
+          <button id="btnMin">3. 選擇MIN點(左下)</button>
+          <button id="btnMax">4. 選擇MAX點(右上)</button>
+          <button id="btnReset">重置座標</button>
+		  -->
+
+          <div class="row zoom-row">
+            <label>縮放：</label>
+            <input id="zoomRange" type="range" min="0.5" max="3.0" step="0.1" value="1.0"/>
+            <span id="zoomVal">100%</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">欄位設定</div>
+          <div class="grid-2">
+            <label>Chip Size 儲存格：</label><input id="chipCell" type="text" value="C3"/>
+            <label>Project Code 儲存格：</label><input id="projectCell" type="text" value="C2"/>
+            <label>Pin編號欄位：</label><input id="pinNoCol" type="text" value="B"/>
+            <label>Pin名稱欄位：</label><input id="pinNameCol" type="text" value="C"/>
+            <label>X座標欄位：</label><input id="xCol" type="text" value="D"/>
+            <label>Y座標欄位：</label><input id="yCol" type="text" value="E"/>
+            <label>資料起始行：</label><input id="startRow" type="number" value="8"/>
+          </div>
+        </div>
+
+        <div class="notice">
+          <div class="section-title">注意事項(by Rita)</div>
+          <ul>
+            <li>僅支援 .xlsx，請勿同時於 Excel 中開啟</li>
+            <li>確保只嵌入 <b>一張圖片</b>（此系統取第一張）</li>
+            <li>A1:E6 若沒資料則不會顯示工作表</li>
+            <li>滑桿可縮放畫布（0.5~3.0）</li>
+            <li>MIN 請點圖片左下；MAX 請點右上；錯誤可按重置</li>
+            <li>PinNo 空白、PinName=NC、或無效座標 會列入「無法連線 PIN」</li>
+            <li>VDD/VDP → 粉紅；VSS → 淺綠；空白 → 灰；含 Q → 淺藍</li>
+          </ul>
+        </div>
+
+      </section>
+
+      <section class="right-pane">
+        <div class="project-code"><span>Project Code：</span><b id="projectCode"></b></div>
+
+        <!-- 主畫布容器（含標籤、文字框、圖片、疊加SVG） -->
+        <div id="stageWrapper">
+          <div id="stage" class="stage" style="width:800px;height:900px;">
+            <img id="chipImage" class="chip-image" alt="chip" />
+            <svg id="overlay" class="overlay" width="800" height="900"></svg>
+            <!-- 文字框與標籤會動態插入 -->
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btnDownload">下載 PNG 截圖</button>
+		  <button id="btnCopy">📋 複製截圖</button>
+        </div>
+
+        <div class="invalid-list">
+          <div class="section-title">無法連線的 PIN</div>
+          <pre id="invalidPins"></pre>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+  <script src="/static/js/html2canvas.min.js"></script>
+</body>
+</html>

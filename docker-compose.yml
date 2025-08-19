@@ -1,0 +1,11 @@
+version: "3.9"
+services:
+  padlist-webapp:
+    build: .
+    container_name: padlist-webapp
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    # 如果要用本機檔案暫存上傳內容，可開啟下行 volumes
+    # volumes:
+    #   - ./app/uploads:/app/uploads
