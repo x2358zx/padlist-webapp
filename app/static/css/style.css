@@ -89,3 +89,21 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
 /* 先隱藏圖片，等成功載入再顯示 */
 .chip-image { display: none; position: absolute; }
 .chip-image.loaded { display: block; }
+
+.version-badge {
+  display: inline-flex;           /* 讓文字和小圖示更居中 */
+  align-items: center;
+  gap: 4px;                       /* 圖示和文字之間的間距 */
+  font-size: 13px;
+  font-weight: 500;               /* 字稍微加粗，看起來更清晰 */
+  color: #fff;                    /* 白字 */
+  background: linear-gradient(135deg, #4CAF50, #2E7D32); /* 綠色漸層 */
+  padding: 4px 10px;              /* 上下 4px、左右 10px，讓 badge 比較圓潤 */
+  border-radius: 999px;           /* 超圓角，做成膠囊狀 */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* 輕微陰影 */
+  transition: background 0.3s ease;
+}
+
+.version-badge:hover {
+  background: linear-gradient(135deg, #66BB6A, #388E3C); /* hover 更亮一點 */
+}
