@@ -16,7 +16,8 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
 
 .left-pane .row { display:flex; align-items:center; gap:8px; margin-bottom:8px; }
 .left-pane .row.group { flex-direction:column; align-items:flex-start; gap:4px; }
-.left-pane input[type="text"], .left-pane input[type="number"], select { border:1px solid #ccc; border-radius:8px; padding:6px 8px; width: 140px; }
+.left-pane input[type="text"], .left-pane input[type="number"], select { border:1px solid #ccc; border-radius:8px; padding:6px 8px; width: 80px; }
+.left-pane select { border:1px solid #ccc; border-radius:8px; padding:6px 8px; width: 250px; }
 .left-pane .btn { display:inline-flex; align-items:center; gap:8px; }
 .left-pane .file-btn { background:#222; color:white; border-radius:8px; padding:8px 12px; cursor:pointer; }
 .left-pane button { background:#0d6efd; color:white; border:none; padding:8px 10px; border-radius:8px; cursor:pointer; }
@@ -38,9 +39,6 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
 
 .overlay { position:absolute; left:0; top:0; pointer-events:none; }
 
-.pin-label, .pin-input { position:absolute; font-size:12px; }
-.pin-label { width:20px; height:20px; display:flex; align-items:center; justify-content:center; border-radius:4px; }
-.pin-input { width:80px; height:20px; border:1px solid #ccc; border-radius:4px; padding:2px 6px; }
 
 /* 顏色 */
 .bg-blue { background:#add8e6; }  /* 淺藍 */
@@ -54,12 +52,23 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
 /* 旋轉的上/下邊欄位 */
 .rotate90 { transform: rotate(90deg); transform-origin:left top; }
 
+.pin-label { 
+position:absolute;
+font-size:12px; 
+width:25px;
+height:25px;
+display:flex;
+align-items:center;
+justify-content:center;
+border-radius:4px;
+}
+
 /* 用於截圖的替身盒子（只在複製/下載時使用） */
 /* 取代原本的 .pin-input：不可編輯的方塊 */
 .pin-box{
   position: absolute;
   width: 80px;
-  height: 20px;
+  height: 25px;
   border: 1px solid #ccc;
   border-radius: 4px;
   background: #fff;

@@ -9,20 +9,20 @@ const PIN_DOT_RADIUS = 2;   // 紅點跟藍點的大小，原本是 4，改小�
 const PIN_LINE_WIDTH = 1.5; // 連線大小，原本是 2
 
 // === Label layout knobs ===
-const STEP_V = 30;     // 垂直間距
-const STEP_H = 30;     // 水平間距
+const STEP_V = 33;     // 垂直間距
+const STEP_H = 33;     // 水平間距
 
-const LEFT_LABEL_X  = 110, LEFT_INPUT_X  = 30,  LEFT_Y0  = 120;  //左排：把 LEFT_INPUT_X 往左移（數值變小）或 LEFT_LABEL_X 往右移（數值變大）。
-const RIGHT_LABEL_X = 640, RIGHT_INPUT_X = 670, RIGHT_Y0 = 120;  //右排：把 RIGHT_INPUT_X 往右移（變大）或 RIGHT_LABEL_X 往左移（變小）。
+const LEFT_LABEL_X  = 10, LEFT_INPUT_X  = 35,  LEFT_Y0  = 125;  //左排：把 LEFT_INPUT_X 往左移（數值變小）或 LEFT_LABEL_X 往右移（數值變大）。
+const RIGHT_LABEL_X = 735, RIGHT_INPUT_X = 655, RIGHT_Y0 = 125;  //右排：把 RIGHT_INPUT_X 往右移（變大）或 RIGHT_LABEL_X 往左移（變小）。
 
-const TOP_LABEL_Y   = 90,  TOP_INPUT_Y   = 10,  TOP_X0   = 155;  //頂/底排：微調 TOP_INPUT_Y / BOTTOM_INPUT_Y
-const BOTTOM_LABEL_Y= 750, BOTTOM_INPUT_Y= 780, BOTTOM_X0= 155;  //（通常 +2~+6 px 就會離開 label），或微調 TOP_X0 / BOTTOM_X0 讓整排左右位移。
+const TOP_LABEL_Y   = 10,  TOP_INPUT_Y   = 35,  TOP_X0   = 125;  //頂/底排：微調 TOP_INPUT_Y / BOTTOM_INPUT_Y
+const BOTTOM_LABEL_Y= 895, BOTTOM_INPUT_Y= 815, BOTTOM_X0= 125;  //（通常 +2~+6 px 就會離開 label），或微調 TOP_X0 / BOTTOM_X0 讓整排左右位移。
 
-// === Pixel per micrometer (px/um) 依你的要求 ===
-// 630 px ↔ 7 mm = 7000 um → 0.09 px/um（垂直）
-// 480 px ↔ 5 mm = 5000 um → 0.096 px/um（水平）
-const PX_PER_UM_Y = 630 / 7000;  // 0.09
-const PX_PER_UM_X = 480 / 5000;  // 0.096
+// === Pixel per micrometer (px/um) ===
+// 640 px ↔ 8.75 mm = 8750 um → 1 px/um（垂直:上盒最下邊 → 下盒最上邊內側距離）
+// 480 px ↔ 6.75 mm = 6750 um → 1 px/um（水平:左盒最右邊 → 右盒最左邊的內側距離）
+const PX_PER_UM_Y = 0.08;  //
+const PX_PER_UM_X = 0.08;  // 
 
 // 把 chip 尺寸(um) 轉成 畫面像素(px)
 function sizeFromChipUm(w_um, h_um) {
@@ -37,9 +37,9 @@ function posLeftInput(i){  return { x: LEFT_INPUT_X,  y: LEFT_Y0  + i*STEP_V }; 
 function posRightLabel(i){ return { x: RIGHT_LABEL_X, y: RIGHT_Y0 + i*STEP_V }; }
 function posRightInput(i){ return { x: RIGHT_INPUT_X, y: RIGHT_Y0 + i*STEP_V }; }
 function posTopLabel(i){   return { x: TOP_X0   + i*STEP_H, y: TOP_LABEL_Y   }; }
-function posTopInput(i){   return { x: TOP_X0+20+ i*STEP_H, y: TOP_INPUT_Y, rotate:true }; }
+function posTopInput(i){   return { x: TOP_X0+25+ i*STEP_H, y: TOP_INPUT_Y, rotate:true }; }
 function posBottomLabel(i){return { x: BOTTOM_X0+ i*STEP_H, y: BOTTOM_LABEL_Y }; }
-function posBottomInput(i){return { x: BOTTOM_X0+20+ i*STEP_H, y: BOTTOM_INPUT_Y, rotate:true }; }
+function posBottomInput(i){return { x: BOTTOM_X0+25+ i*STEP_H, y: BOTTOM_INPUT_Y, rotate:true }; }
 
 const stage = document.getElementById("stage");
 const overlay = document.getElementById("overlay");
@@ -106,6 +106,8 @@ function buildSideUI(){
     div.textContent = lab;
     // highlight special
     if(["17","18","19","22"].includes(lab)) div.classList.add("bg-blue");
+	if(["9"].includes(lab)) div.classList.add("bg-pink");
+	if(["11"].includes(lab)) div.classList.add("bg-green");
     stage.appendChild(div);
     labelDivsByLabel.set(lab, div);
 
@@ -132,6 +134,8 @@ function buildSideUI(){
     div.style.left = L.x + "px"; div.style.top = L.y + "px";
     div.textContent = lab;
     if(["56","57","58","59"].includes(lab)) div.classList.add("bg-blue");
+	if(["61"].includes(lab)) div.classList.add("bg-pink");
+	if(["60"].includes(lab)) div.classList.add("bg-green");
     stage.appendChild(div);
     labelDivsByLabel.set(lab, div);
 
@@ -150,6 +154,8 @@ function buildSideUI(){
     div.className = "pin-label side-top";
     div.style.left = L.x + "px"; div.style.top = L.y + "px";
     div.textContent = lab;
+	if(["87","92"].includes(lab)) div.classList.add("bg-pink");
+	if(["91"].includes(lab)) div.classList.add("bg-green");
     stage.appendChild(div);
     labelDivsByLabel.set(lab, div);
 
@@ -168,6 +174,8 @@ function buildSideUI(){
     div.className = "pin-label side-bottom";
     div.style.left = L.x + "px"; div.style.top = L.y + "px";
     div.textContent = lab;
+	if(["41"].includes(lab)) div.classList.add("bg-pink");
+	if(["40"].includes(lab)) div.classList.add("bg-green");
     stage.appendChild(div);
     labelDivsByLabel.set(lab, div);
 
@@ -284,6 +292,35 @@ function processPinDataToInputs(){
   invalidEl.textContent = INVALID_PINS.join("\n");
 }
 
+// 根據 side-* 類別，回傳 .pin-box 在「stage 座標」中的內側邊緣中點
+function innerAnchorOfBox(boxEl) {
+  const lb = boxEl.getBoundingClientRect();        // 盒子在視窗的實際位置（含 rotate/scale）
+  const st = stage.getBoundingClientRect();        // stage 在視窗的位置
+  const toStageX = (vx) => (vx - st.left) / DISPLAY_SCALE;
+  const toStageY = (vy) => (vy - st.top ) / DISPLAY_SCALE;
+
+  // 內側：指向 chip 的那一邊
+  if (boxEl.classList.contains("side-left")) {
+    // 右邊緣中點
+    return { x: toStageX(lb.right), y: toStageY(lb.top + lb.height/2) };
+  }
+  if (boxEl.classList.contains("side-right")) {
+    // 左邊緣中點
+    return { x: toStageX(lb.left),  y: toStageY(lb.top + lb.height/2) };
+  }
+  if (boxEl.classList.contains("side-top")) {
+    // 下邊緣中點（rotate90 也會正確）
+    return { x: toStageX(lb.left + lb.width/2), y: toStageY(lb.bottom) };
+  }
+  if (boxEl.classList.contains("side-bottom")) {
+    // 上邊緣中點
+    return { x: toStageX(lb.left + lb.width/2), y: toStageY(lb.top) };
+  }
+  // fallback: 中心點
+  return { x: toStageX(lb.left + lb.width/2), y: toStageY(lb.top + lb.height/2) };
+}
+
+
 // ====== Draw pins and lines ======
 function drawPinsAndLines(){
   clearOverlay();
@@ -299,17 +336,17 @@ function drawPinsAndLines(){
     if(!pt) return;
     drawCircle(pt.x, pt.y, PIN_DOT_RADIUS, "#f00", `PIN_${p.pin_no}`);
 
-    // Connect to label center (inside stage)
-    const labelDiv = labelDivsByLabel.get(p.pin_no);
-    if(labelDiv){
-      const rect = { x: labelDiv.offsetLeft, y: labelDiv.offsetTop, w: labelDiv.offsetWidth, h: labelDiv.offsetHeight };
-      const cx = rect.x + rect.w/2;
-      const cy = rect.y + rect.h/2;
-      drawLine(pt.x, pt.y, cx, cy, "#f00", PIN_LINE_WIDTH, `LINE_${p.pin_no}`);
-
-      // Bold effect via CSS? quick: make font-weight bold
-      labelDiv.style.fontWeight = "700";
+    // 以「pin 盒子 .pin-box」為對象，連到內側邊緣
+    const boxEl = inputsByLabel.get(p.pin_no);
+    if (boxEl) {
+      const anchor = innerAnchorOfBox(boxEl); // 內側錨點
+      drawLine(pt.x, pt.y, anchor.x, anchor.y, "#f00", PIN_LINE_WIDTH, `LINE_${p.pin_no}`);
+    
+      // （可選）讓對應的標籤加粗
+      const labelDiv = labelDivsByLabel.get(p.pin_no);
+      if (labelDiv) labelDiv.style.fontWeight = "700";
     }
+
   });
 }
 
