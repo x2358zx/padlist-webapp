@@ -278,19 +278,34 @@ function applyInputColors(){
 
 // ====== Wiring pins to labels ======
 function processPinDataToInputs(){
+  // 先建立一個新的陣列，存真正有效的 pin
+  const trulyValid = [];
+
   VALID_PINS.forEach(p => {
     const el = inputsByLabel.get(p.pin_no);
     if(el){
-//-     el.value = p.pin_name;
+      // 如果有對應的 label 才算是有效 PIN
       el.textContent = p.pin_name || "";
+      trulyValid.push(p);
     }else{
+      // 沒有 label 的就丟到 INVALID_PINS
       const msg = `${p.pin_no}, ${p.pin_name}`;
       if(!INVALID_PINS.includes(msg)) INVALID_PINS.push(msg);
     }
   });
+
+  // 更新 VALID_PINS，只留下真的有對應 label 的 pin
+  VALID_PINS = trulyValid;
+
   applyInputColors();
   invalidEl.textContent = INVALID_PINS.join("\n");
+
+  // 額外輸出方便 debug
+  console.log("真正有效的 pins:", VALID_PINS.map(p=>p.pin_no));
+  console.log("被扣掉的 pins:", INVALID_PINS);
 }
+
+
 
 // 根據 side-* 類別，回傳 .pin-box 在「stage 座標」中的內側邊緣中點
 function innerAnchorOfBox(boxEl) {
