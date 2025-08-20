@@ -168,8 +168,8 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
   align-items: stretch;
   gap: 10px;
   padding: 8px 12px;         /* 與 header 保持距離 */
-  想讓它一直貼在頂部可改成 sticky：
-     position: sticky; top: 0; z-index: 50; background: #fff;
+  /* 想讓它一直貼在頂部可改成 sticky：*/
+  position: sticky; top: 0; z-index: 50; background: #fff;
 }
 
 .status-bar .status{
