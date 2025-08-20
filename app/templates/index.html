@@ -11,7 +11,6 @@
 <body>
   <div class="container">
     <header>
-      <div class="nowtime" id="nowtime"></div>
       <div class="title">PAD List</div>
 	  <div class="version-badge" title="PAD List 第一版: 2024/12/02&#10;新增截圖/滾輪縮放/無法連線 PIN: 2024/12/22">
         <span class="icon">⚙</span>
@@ -96,13 +95,17 @@
       </section>
 
       <section class="right-pane">
-        <div class="project-code"><span>Project Code：</span><b id="projectCode"></b></div>
-
         <!-- 主畫布容器（含標籤、文字框、圖片、疊加SVG） -->
         <div id="stageWrapper">
           <div id="stage" class="stage" style="width:780px;height:900px;">
             <img id="chipImage" class="chip-image" alt="chip" />
             <svg id="overlay" class="overlay" width="780" height="900"></svg>
+			
+			<!-- 新增：畫布 HUD（左：Project Code；右：時間） -->
+			<div class="stage-hud">
+			  <div class="hud-item project-code"><span>Project Code：</span><b id="projectCode"></b></div>
+			  <div class="hud-item nowtime" id="nowtime"></div>
+			</div>
             <!-- 文字框與標籤會動態插入 -->
           </div>
         </div>

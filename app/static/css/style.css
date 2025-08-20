@@ -107,3 +107,56 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
 .version-badge:hover {
   background: linear-gradient(135deg, #66BB6A, #388E3C); /* hover 更亮一點 */
 }
+
+/* 讓 stage 成為定位容器 */
+#stage, .stage { position: relative; }
+
+/* === 底部 HUD：統一高度、完美對齊 === */
+.stage-hud{
+  /* 已在底部：left/right/bottom 請保留你的設定 */
+  position: absolute;
+  left: 8px; right: 8px; bottom: 8px;
+
+  display: flex;
+  align-items: stretch;      /* 讓每個 item 拉到同高 */
+  justify-content: space-between;
+  gap: 8px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* 膠囊本體：固定高度，文字垂直置中 */
+.stage-hud .hud-item{
+  display: flex;
+  align-items: center;
+  height: 34px;              /* ← 統一高度（想更厚可調 36/38） */
+  box-sizing: border-box;
+  padding: 0 12px;           /* 垂直用 0，文字自然置中 */
+  line-height: 1;            /* 避免行高影響觀感 */
+  font-size: 12px;           /* 兩邊字體一致 */
+  background: rgba(255,255,255,0.92);
+  border: 1px solid #ddd;
+  border-radius: 999px;      /* 更圓潤的膠囊 */
+  color: #333;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  pointer-events: auto;
+}
+
+/* Project Code 區可伸縮，長字用省略號 */
+.stage-hud .project-code{
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stage-hud .project-code span{ margin-right: 6px; opacity: .7; }
+
+/* 時間固定寬度、不被擠壓 */
+.stage-hud .nowtime{ flex: 0 0 auto; }
+
+/* 避免繼承到 header 的 margin 規則 */
+.stage .nowtime, .stage .project-code { margin: 0; }
+
+/* （可選）在畫布內預留空間，避免視覺壓住底部內容 */
+.stage { padding-bottom: 44px; }

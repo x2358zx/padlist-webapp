@@ -316,6 +316,10 @@ function drawPinsAndLines(){
 // === 用 html2canvas 把 #stage 直接截圖（所見即所得） ===
 // 為了避免 <input> 的 baseline 偏移，截圖時用 clone，把 .pin-input 改成 .pin-box
 async function renderStageCanvas() {
+  // 新增：截圖前刷新時間顯示
+  const nt = document.getElementById("nowtime");
+  if (nt) nt.textContent = nowTime();
+  
   const stage = document.getElementById("stage");
   const canvas = await html2canvas(stage, {
     backgroundColor: "#fff",
