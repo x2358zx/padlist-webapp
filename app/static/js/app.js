@@ -211,7 +211,7 @@ function drawText(x,y,txt,color="#00f"){
   const t = document.createElementNS("http://www.w3.org/2000/svg","text");
   t.setAttribute("x", x); t.setAttribute("y", y);
   t.setAttribute("fill", color);
-  t.setAttribute("font-size","12");
+  t.setAttribute("font-size","8");
   t.textContent = txt;
   overlay.appendChild(t);
 }
@@ -325,8 +325,8 @@ function innerAnchorOfBox(boxEl) {
 function drawPinsAndLines(){
   clearOverlay();
   // draw MIN/MAX (藍點)
-  if(MIN_POINT){ drawCircle(MIN_POINT.x, MIN_POINT.y, PIN_DOT_RADIUS, "#00f"); drawText(MIN_POINT.x+10, MIN_POINT.y-10, "MIN","#00f"); }
-  if(MAX_POINT){ drawCircle(MAX_POINT.x, MAX_POINT.y, PIN_DOT_RADIUS, "#00f"); drawText(MAX_POINT.x-10, MAX_POINT.y+10, "MAX","#00f"); }
+  if(MIN_POINT){ drawCircle(MIN_POINT.x, MIN_POINT.y, PIN_DOT_RADIUS, "#00f"); drawText(MIN_POINT.x+5, MIN_POINT.y-5, "MIN","#00f"); }
+  if(MAX_POINT){ drawCircle(MAX_POINT.x, MAX_POINT.y, PIN_DOT_RADIUS, "#00f"); drawText(MAX_POINT.x-20, MAX_POINT.y+10, "MAX","#00f"); }
 
   const chipW = Number(chipWidthEl.value), chipH = Number(chipHeightEl.value);
   if(!chipW || !chipH || !MIN_POINT || !MAX_POINT) return;

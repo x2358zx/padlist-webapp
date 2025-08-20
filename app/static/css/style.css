@@ -73,8 +73,9 @@ border-radius:4px;
   border-radius: 4px;
   background: #fff;
   font-size: 12px;
-  line-height: 20px;        /* 垂直置中 */
-  text-align: center;       /* 水平置中 */
+  display: flex;                /* ← 讓內容水平/垂直置中 */
+  align-items: center;          /* 垂直置中 */
+  justify-content: center;      /* 水平置中 */
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
