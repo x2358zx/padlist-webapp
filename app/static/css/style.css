@@ -160,3 +160,47 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
 
 /* （可選）在畫布內預留空間，避免視覺壓住底部內容 */
 .stage { padding-bottom: 44px; }
+
+/* ===== 頁面狀態列（header 下方，非截圖區） ===== */
+.status-bar{
+  display: flex;
+  justify-content: center;   /* 整排置中 */
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 12px;         /* 與 header 保持距離 */
+  想讓它一直貼在頂部可改成 sticky：
+     position: sticky; top: 0; z-index: 50; background: #fff;
+}
+
+.status-bar .status{
+  display: flex;
+  align-items: center;       /* 垂直置中 */
+  justify-content: center;   /* 文字水平置中 */
+  height: 34px;              /* 統一高度 */
+  padding: 0 14px;
+  border-radius: 999px;      /* 膠囊外觀 */
+  border: 1px solid #ddd;
+  background: rgba(255,255,255,.96);
+  line-height: 1;
+  font-size: 12px;
+  white-space: nowrap;
+  max-width: 60vw;           /* 避免太長撐滿 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+
+/* 狀態配色（可自行調整） */
+.status-bar .status.normal{
+  border-color: #cfe0ff;
+  background: rgba(240,248,255,.96);
+  color: #1d3a6a;
+}
+.status-bar .status.error{
+  border-color: #f2b5b5;
+  background: rgba(255,235,235,.96);
+  color: #b00020;
+}
+
+/* 沒內容就自動隱藏第二顆 */
+.status-bar .status:empty{ display: none; }
