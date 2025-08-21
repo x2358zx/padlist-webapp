@@ -228,6 +228,7 @@ function clearImageAndState(){
   // chip 尺寸欄位與圖片尺寸歸零（保險）
   // 清空 Project Code（一起清掉舊專案代碼顯示）
   projectCodeEl.textContent = "";
+  hideDataControls();
 }
 
 // 取得元素在「stage 原始座標」的外框（會把縮放/平移還原）
