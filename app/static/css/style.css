@@ -53,7 +53,13 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
   /* left/top 會被你那段 JS 置中計算覆寫 */
 }
 
-.overlay { position:absolute; left:0; top:0; pointer-events:none; }
+.overlay { 
+  position:absolute; 
+  left:0; 
+  top:0; 
+  pointer-events:none; 
+  z-index: 15; /* ★ 新增，確保圖層在文字框(z-index:10)之上 */
+}
 
 
 /* 顏色 */
@@ -308,4 +314,37 @@ border-radius:4px;
 .is-invalid{
   outline: 2px solid #dc3545;
   background: #fff5f5;
+}
+
+/* --- 底部的 EPAD 背景裝飾 --- */
+#epadBackground {
+  position: absolute;
+  /* 透過 left: 50% 和 transform 來達成水平置中 */
+  left: 50%;
+  top: 47%;                     /* ★ 修改：從 top 往下 50% */
+  transform: translate(-50%, -50%); /* ★ 修改：水平和垂直都回移 50% */
+  
+  width: 400px;
+  height: 560px;
+  
+  background: #ffffe0; /* 淺黃色背景 */
+  border: 2px dashed #f0e68c; /* 黃色虛線 */
+  border-radius: 12px;
+  
+  /* --- EPAD 文字的樣式 --- */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80px; /* 加大字體 */
+  font-weight: bold; /* 粗體 */
+  color: rgba(211, 211, 211, 0.7); /* 淡灰色半透明 */
+  
+  /* 確保它在最底層，圖片會蓋在它上面 */
+  z-index: 1;
+}
+
+/* 讓圖片的 z-index 比背景高，確保能蓋住 */
+.chip-image {
+  position: absolute;
+  z-index: 2;
 }
