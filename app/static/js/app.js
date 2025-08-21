@@ -500,7 +500,7 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
   SESSION_ID = data.session_id;
   setStatus("已選擇檔案: " + f.name);
 
-  // fill sheets
+  // 只填入「有圖的工作表」
   sheetSelector.innerHTML = "";
   (data.sheets || []).forEach(name=>{
     const opt = document.createElement("option");
@@ -508,16 +508,31 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
     sheetSelector.appendChild(opt);
   });
 
+//  // handle no sheets
+//  if(!sheetSelector.options.length){
+//    setError("沒有偵測到有效工作表，已列出為空。\n請確認：\n1) 試著切換到有資料的工作表再存檔再上傳\n2) 或把範例檔給我，我會調整偵測規則");
+//  }
+//  // set image (if any)
+//  if(data.image_url){
+//    chipImage.src = data.image_url;
+//  }else{
+//    chipImage.removeAttribute("src");
+//  }
 
-  // handle no sheets
+  // 若沒有任何含圖的工作表 → 顯示提示並維持空畫面
   if(!sheetSelector.options.length){
-    setError("沒有偵測到有效工作表，已列出為空。\n請確認：\n1) 試著切換到有資料的工作表再存檔再上傳\n2) 或把範例檔給我，我會調整偵測規則");
-  }
-  // set image (if any)
-  if(data.image_url){
-    chipImage.src = data.image_url;
-  }else{
+    setError("這個檔案內沒有任何『含圖片』的工作表：\n請在 Excel 中插入圖片（插入→圖片），存檔後再上傳。");
     chipImage.removeAttribute("src");
+    chipImage.classList.remove("loaded");
+    return;
+  }
+  // 初始：顯示第一個有圖工作表的「最大張」圖片
+  if (data.default_image_url) {
+    chipImage.classList.remove('loaded');
+    chipImage.src = data.default_image_url;
+  } else {
+    chipImage.removeAttribute("src");
+    chipImage.classList.remove("loaded");
   }
 
   // auto query sheet info
@@ -567,7 +582,7 @@ async function querySheetInfo(){
   clearOverlay(); MIN_POINT = null; MAX_POINT = null;
   VALID_PINS = []; INVALID_PINS = [];
   invalidEl.textContent = "";
-  setStatus("工作表已載入，請確認 Chip Size 或直接按「2. 載入資料」");
+  setStatus("工作表已載入最大張圖片，請確認 Chip Size 或直接按「2. 載入資料」");
 }
 
 document.getElementById("loadDataBtn").addEventListener("click", async ()=>{

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -12,7 +11,7 @@
   <div class="container">
     <header>
       <div class="title">PAD List</div>
-	  <div class="version-badge" title="PAD List WEB 第一版: 2025/08/20">
+	  <div class="version-badge" title="PAD List WEB v1.1.0: 2025/08/20">
         <span class="icon">⚙</span>
         <span>Version 1.1.0</span>
       </div>
@@ -57,19 +56,8 @@
             <button id="loadDataBtn">2. 載入資料</button>
           </div>
         </div>
-<div id="dataControls" hidden>
-        <div class="coord-controls">
-		<!--
-          <button id="btnMin">3. 選擇MIN點(左下)</button>
-          <button id="btnMax">4. 選擇MAX點(右上)</button>
-          <button id="btnReset">重置座標</button>
-		  -->
 
-          <div class="row zoom-row">
-            <label>縮放(ctrl+滾輪)：</label>
-            <span id="zoomVal">100%</span>
-          </div>
-        </div>
+
 
         <div class="section">
           <div class="section-title">欄位設定</div>
@@ -84,7 +72,20 @@
           </div>
 
         </div>
+<div id="dataControls" hidden>
+        <div class="coord-controls">
+		<!--
+          <button id="btnMin">3. 選擇MIN點(左下)</button>
+          <button id="btnMax">4. 選擇MAX點(右上)</button>
+          <button id="btnReset">重置座標</button>
+		  -->
 
+          <div class="row zoom-row">
+            <label>縮放(ctrl+滾輪)：</label>
+            <span id="zoomVal">100%</span>
+          </div>
+        </div>
+		
 	    <fieldset class="group capsule-block">
           <legend class="capsule-legend">邊界內縮（MIN/MAX OFFSET）</legend>
         
@@ -132,7 +133,7 @@
           <div class="section-title">注意事項(by Rita)</div>
           <ul>
             <li>僅支援 .xlsx，請勿同時於 Excel 中開啟</li>
-            <li>確保只嵌入 <b>一張圖片</b>（此系統取第一張）</li>
+            <li>每個工作表僅使用該表<b>第一張圖片</b></li>
             <li>A1:E6 若沒資料則不會顯示工作表</li>
             <li>滑桿可縮放畫布（0.5~3.0）</li>
             <li>MIN 請點圖片左下；MAX 請點右上；錯誤可按重置</li>
@@ -172,7 +173,8 @@
     </main>
   </div>
 
+  <script src="/static/js/html2canvas.min.js"></script> <!--先載入依賴檔-->
   <script src="/static/js/app.js"></script>
-  <script src="/static/js/html2canvas.min.js"></script>
+  
 </body>
 </html>
