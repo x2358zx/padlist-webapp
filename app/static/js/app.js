@@ -99,6 +99,16 @@ function sanitizeNumberInput(el){
     el.value = txt;
   });
 }
+
+function resetChipSizeUI(){
+  // 清空欄位
+  chipWidthEl.value = "";
+  chipHeightEl.value = "";
+  // 清掉圖片尺寸，避免沿用上一張
+  chipImage.style.width = "";
+  chipImage.style.height = "";
+}
+
 sanitizeNumberInput(chipWidthEl);
 sanitizeNumberInput(chipHeightEl);
 
@@ -478,6 +488,7 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
   const f = e.target.files[0];
   if(!f){ return; }
   setError("");
+  resetChipSizeUI();
   setStatus("上傳中...");
   hideDataControls();
   const fd = new FormData();
@@ -521,6 +532,7 @@ async function querySheetInfo(){
   hideDataControls();
   if(!SESSION_ID || !sheetSelector.value) return;
   setError("");
+  resetChipSizeUI();
   const fd = new FormData();
   fd.append("session_id", SESSION_ID);
   fd.append("sheet_name", sheetSelector.value);
