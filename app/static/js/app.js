@@ -107,6 +107,29 @@ function sanitizeNumberInput(el){
   });
 }
 
+// === 驗證/紅框控制（只在「載入錯誤」時才加紅框） ===
+// 判斷 chip 寬/高欄位是否都有有效數值
+function hasChipSizeValues(){
+  const w = parseFloat(chipWidthEl.value);
+  const h = parseFloat(chipHeightEl.value);
+  return Number.isFinite(w) && w > 0 && Number.isFinite(h) && h > 0;
+}
+
+/** 控制 chip 寬/高欄位的紅框（.is-invalid）
+ *  規則：
+ *   1) 清空欄位時不自動加紅框（避免閃紅）
+ *   2) 只有在「載入錯誤」時才 markChipSizeInvalid(true)
+ *   3) 當欄位有值且載入正確時，再 markChipSizeInvalid(false) 清掉紅框
+ */
+function markChipSizeInvalid(show, reason = ""){
+  [chipWidthEl, chipHeightEl].forEach(el=>{
+    if(!el) return;
+    el.classList.toggle('is-invalid', !!show);
+    if(show){ el.title = reason || "載入錯誤"; } else { el.removeAttribute('title'); }
+  });
+}
+
+
 function resetChipSizeUI(){
   // 清空欄位
   chipWidthEl.value = "";
@@ -287,11 +310,18 @@ chipImage.addEventListener('load', () => {
   const req = Number(chipImage.dataset.req || "0");
   if (req === CURRENT_SHEET_REQ) {
     revealLoadBtn();
+	// ✅ 只有當寬/高都有數值時，才清除紅框（避免清空時先閃紅）
+    if (hasChipSizeValues()) markChipSizeInvalid(false);
   }
 });
+
 chipImage.addEventListener('error', () => {
   chipImage.classList.remove('loaded');   // 失敗就維持圖片隱藏
+  const req = Number(chipImage.dataset.req || "0");
+  if (req !== CURRENT_SHEET_REQ) return;  // ⛔ 舊請求的錯誤忽略，避免瞬間閃紅
   hideLoadBtn();                          // 也把載入資料按鈕藏起來
+  // ❌ 只有在「載入錯誤」時才加紅框
+  markChipSizeInvalid(true, "圖片載入失敗或路徑無效");
 });
 
 // ====== Draw on SVG overlay ======
@@ -607,16 +637,20 @@ async function querySheetInfo(){
     const w = Number(data?.chip_size?.width)  || 0;
     const h = Number(data?.chip_size?.height) || 0;
     const hasChipSize = w > 0 && h > 0;
+	
     if (!hasChipSize) {
       // 這個工作表沒有 chip size → 不載圖、清乾淨、顯示錯誤
       clearImageAndState();
-      // 3) 顯示錯誤訊息並中止，不載入圖片
       setError("此工作表未偵測到 chip size（寬/高）。請於指定儲存格填入格式：123 um x 456 um");
+      // ❌ 這是「載入錯誤」類型（資料缺失），此時才加紅框
+      markChipSizeInvalid(true, "未偵測到 chip size（寬/高）");
       return;
     } else {
-      // 有 chip size → 設定顯示尺寸並載圖
+      // ✅ 有 chip size → 設定顯示尺寸並載圖 & 先填值，再清除紅框（有值才清掉，避免清空時閃紅）
       chipWidthEl.value  = w.toFixed(3);
       chipHeightEl.value = h.toFixed(3);
+	  markChipSizeInvalid(false);
+	  
       const sz = sizeFromChipUm(w, h);
       chipImage.style.width  = sz.w + "px";
       chipImage.style.height = sz.h + "px";
@@ -626,8 +660,11 @@ async function querySheetInfo(){
       chipImage.dataset.req = String(token); // 標記此圖對應的請求序號
       chipImage.src = data.image_url;        // 交給瀏覽器載入
       } else {
-        clearImageAndState();                  // 保守：若無圖，同樣清乾淨
+        // 找不到圖 → 視為載入錯誤，才加紅框
+        clearImageAndState();
         setError("此工作表未找到可用圖片。");
+        markChipSizeInvalid(true, "此工作表未找到可用圖片");
+        return; // 這裡直接結束，避免後面流程繼續
       }
     }
   projectCodeEl.textContent = data.project_code || "";
