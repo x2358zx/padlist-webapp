@@ -216,12 +216,16 @@ function clearImageAndState(){
   chipImage.classList.remove('loaded');
   chipImage.style.width = "";
   chipImage.style.height = "";
+  // 再清欄位與狀態
+  resetChipSizeUI();
   // 清幾何/疊圖
-  clearOverlay(); MIN_POINT = null; MAX_POINT = null;
-  VALID_PINS = []; INVALID_PINS = [];
+  clearOverlay();
+  MIN_POINT = null;
+  MAX_POINT = null;
+  VALID_PINS = [];
+  INVALID_PINS = [];
   invalidEl.textContent = "";
   // chip 尺寸欄位與圖片尺寸歸零（保險）
-  resetChipSizeUI();
 }
 
 // 取得元素在「stage 原始座標」的外框（會把縮放/平移還原）
