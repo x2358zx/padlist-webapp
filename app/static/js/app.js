@@ -75,6 +75,7 @@ let MAX_POINT = null; // {x,y}
 
 let VALID_PINS = []; // {pin_no, pin_name, x, y}
 let INVALID_PINS = [];
+let CURRENT_SHEET_REQ = 0; // === Sheet 切換請求序號：只採用最後一次回應，避免瞬閃 ===
 
 const inputsByLabel = new Map(); // label string -> input element
 const labelDivsByLabel = new Map(); // label string -> label element
@@ -206,6 +207,21 @@ function buildSideUI(){
     stage.appendChild(box);
     inputsByLabel.set(lab, box);
   });
+}
+
+// === 當 chip size 缺漏時，統一清乾淨畫面 ===
+function clearImageAndState(){
+  // 清圖片
+  chipImage.removeAttribute('src');
+  chipImage.classList.remove('loaded');
+  chipImage.style.width = "";
+  chipImage.style.height = "";
+  // 清幾何/疊圖
+  clearOverlay(); MIN_POINT = null; MAX_POINT = null;
+  VALID_PINS = []; INVALID_PINS = [];
+  invalidEl.textContent = "";
+  // chip 尺寸欄位與圖片尺寸歸零（保險）
+  resetChipSizeUI();
 }
 
 // 取得元素在「stage 原始座標」的外框（會把縮放/平移還原）
@@ -488,7 +504,8 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
   const f = e.target.files[0];
   if(!f){ return; }
   setError("");
-  resetChipSizeUI();
+  // 先清空圖片，再清空 chip 欄位（避免先清欄位造成瞬間閃爍）
+  clearImageAndState();
   setStatus("上傳中...");
   hideDataControls();
   const fd = new FormData();
@@ -526,14 +543,15 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
     chipImage.classList.remove("loaded");
     return;
   }
+  //註解:避免在還不知道 chip size 時就先顯示圖片（會被下一步清掉而閃一下）
   // 初始：顯示第一個有圖工作表的「最大張」圖片
-  if (data.default_image_url) {
-    chipImage.classList.remove('loaded');
-    chipImage.src = data.default_image_url;
-  } else {
-    chipImage.removeAttribute("src");
-    chipImage.classList.remove("loaded");
-  }
+  //if (data.default_image_url) {
+  //  chipImage.classList.remove('loaded');
+  //  chipImage.src = data.default_image_url;
+  //} else {
+  //  chipImage.removeAttribute("src");
+  //  chipImage.classList.remove("loaded");
+  //}
 
   // auto query sheet info
   if(sheetSelector.value){
@@ -547,7 +565,10 @@ async function querySheetInfo(){
   hideDataControls();
   if(!SESSION_ID || !sheetSelector.value) return;
   setError("");
-  resetChipSizeUI();
+  
+  // ★ 這次查詢的序號（只用最後一次的結果）
+  const token = ++CURRENT_SHEET_REQ;
+  
   const fd = new FormData();
   fd.append("session_id", SESSION_ID);
   fd.append("sheet_name", sheetSelector.value);
@@ -555,38 +576,77 @@ async function querySheetInfo(){
   fd.append("project_code_cell", document.getElementById("projectCell").value || "C2");
   const res = await fetch("/sheet_info", { method:"POST", body: fd });
   const data = await res.json();
-  if(data.error){ setError(data.error); return; }
-  if (data.chip_size && data.chip_size.width && data.chip_size.height) {
-    chipWidthEl.value  = Number(data.chip_size.width).toFixed(3);  // um
-    chipHeightEl.value = Number(data.chip_size.height).toFixed(3); // um
   
-    // 依 630px/7mm 與 480px/5mm 直接換算
-    const sz = sizeFromChipUm(data.chip_size.width, data.chip_size.height);
-    chipImage.style.width  = sz.w + "px";
-    chipImage.style.height = sz.h + "px";
-  }
+  // 若這不是最後一次請求的回應 → 丟棄，避免舊回應覆蓋新狀態
+//  if (token !== CURRENT_SHEET_REQ) return;
+//  if(data.error){ setError(data.error); return; }
+//  
+//  if (data.chip_size && data.chip_size.width && data.chip_size.height) {
+//    chipWidthEl.value  = Number(data.chip_size.width).toFixed(3);  // um
+//    chipHeightEl.value = Number(data.chip_size.height).toFixed(3); // um
+//  
+//    // 依 630px/7mm 與 480px/5mm 直接換算
+//    const sz = sizeFromChipUm(data.chip_size.width, data.chip_size.height);
+//    chipImage.style.width  = sz.w + "px";
+//    chipImage.style.height = sz.h + "px";
+//  }
+//
+//  if(data.image_url){
+//	chipImage.classList.remove('loaded'); // 先移除，等 load 事件再顯示
+//    chipImage.src = data.image_url;       // 交給瀏覽器載入
+//  }else{
+//    chipImage.removeAttribute('src');
+//    chipImage.classList.remove('loaded'); // 保持隱藏，就不會出現「chip」字
+//  }
 
-  if(data.image_url){
-	chipImage.classList.remove('loaded'); // 先移除，等 load 事件再顯示
-    chipImage.src = data.image_url;       // 交給瀏覽器載入
-  }else{
-    chipImage.removeAttribute('src');
-    chipImage.classList.remove('loaded'); // 保持隱藏，就不會出現「chip」字
-  }
+    // === 依 chip size 是否有值，決定是否載入圖片 ===
+    const w = Number(data?.chip_size?.width)  || 0;
+    const h = Number(data?.chip_size?.height) || 0;
+    const hasChipSize = w > 0 && h > 0;
+    if (!hasChipSize) {
+      // 這個工作表沒有 chip size → 不載圖、清乾淨、顯示錯誤
+      clearImageAndState();
+      // 3) 顯示錯誤訊息並中止，不載入圖片
+      setError("此工作表未偵測到 chip size（寬/高）。請於指定儲存格填入格式：123 um x 456 um");
+      return;
+    } else {
+      // 有 chip size → 設定顯示尺寸並載圖
+      chipWidthEl.value  = w.toFixed(3);
+      chipHeightEl.value = h.toFixed(3);
+      const sz = sizeFromChipUm(w, h);
+      chipImage.style.width  = sz.w + "px";
+      chipImage.style.height = sz.h + "px";
+      if (data.image_url) {
+        chipImage.classList.remove('loaded');  // 成功 load 事件才顯示
+        chipImage.src = data.image_url;
+      } else {
+        clearImageAndState();                  // 保守：若無圖，同樣清乾淨
+        setError("此工作表未找到可用圖片。");
+      }
+    }
   projectCodeEl.textContent = data.project_code || "";
 
   // rebuild UI (labels/inputs), clear overlay & pins
   buildSideUI();
   // 依四側 pin-box 內側框置中 chip 圖
-  centerChipImageInInnerFrame();
-  clearOverlay(); MIN_POINT = null; MAX_POINT = null;
-  VALID_PINS = []; INVALID_PINS = [];
-  invalidEl.textContent = "";
-  setStatus("工作表已載入最大張圖片，請確認 Chip Size 或直接按「2. 載入資料」");
+  // 置中僅在有圖時才做，避免做多餘動作
+  if (hasChipSize && data.image_url) {
+    centerChipImageInInnerFrame();
+    clearOverlay(); MIN_POINT = null; MAX_POINT = null;
+    VALID_PINS = []; INVALID_PINS = [];
+    invalidEl.textContent = "";
+    setStatus("已載入：最大張圖片與 chip size；可直接按「2. 載入資料」");
+  }
 }
 
 document.getElementById("loadDataBtn").addEventListener("click", async ()=>{
   if(!SESSION_ID || !sheetSelector.value){ setError("請先選擇檔案與工作表"); return; }
+  
+  if(!chipWidthEl.value || !chipHeightEl.value){
+   setError("本工作表缺少 chip size（寬/高），已略過載入。請先於 Excel 指定儲存格填入 chip size（寬/高）。");
+   return;
+  }
+  
   setError("");
   const fd = new FormData();
   fd.append("session_id", SESSION_ID);
