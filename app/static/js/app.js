@@ -67,6 +67,12 @@ const dataControls = document.getElementById("dataControls");
 const hideDataControls   = () => dataControls?.setAttribute("hidden", "");
 const revealDataControls = () => dataControls?.removeAttribute("hidden");
 
+// 載入資料按鈕（僅控制這顆，不動 hideDataControls）
+const loadDataBtn = document.getElementById("loadDataBtn");
+// 專用：隱藏/顯示載入按鈕（同時設 disabled，避免被鍵盤觸發）
+const hideLoadBtn   = () => { loadDataBtn?.setAttribute("hidden",""); loadDataBtn.disabled = true;  };
+const revealLoadBtn = () => { loadDataBtn?.removeAttribute("hidden");  loadDataBtn.disabled = false; };
+
 
 let SESSION_ID = null;
 let DISPLAY_SCALE = 1.0;
@@ -229,6 +235,7 @@ function clearImageAndState(){
   // 清空 Project Code（一起清掉舊專案代碼顯示）
   projectCodeEl.textContent = "";
   hideDataControls();
+  hideLoadBtn(); // 註解：清畫面時一併把「載入資料」按鈕隱藏，避免殘留
 }
 
 // 取得元素在「stage 原始座標」的外框（會把縮放/平移還原）
@@ -274,12 +281,17 @@ function centerChipImageInInnerFrame(){
 }
 
 
-// 讓圖片成功載入才顯示；失敗就維持隱藏
+// 只有「當前工作表請求」的圖片載入成功，才開啟載入按鈕
 chipImage.addEventListener('load', () => {
   chipImage.classList.add('loaded');
+  const req = Number(chipImage.dataset.req || "0");
+  if (req === CURRENT_SHEET_REQ) {
+    revealLoadBtn();
+  }
 });
 chipImage.addEventListener('error', () => {
-  chipImage.classList.remove('loaded');   // 保持隱藏
+  chipImage.classList.remove('loaded');   // 失敗就維持圖片隱藏
+  hideLoadBtn();                          // 也把載入資料按鈕藏起來
 });
 
 // ====== Draw on SVG overlay ======
@@ -511,6 +523,7 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
   const f = e.target.files[0];
   if(!f){ return; }
   setError("");
+  hideLoadBtn();           // 換新檔 → 先把載入資料按鈕藏起來
   // 先清空圖片，再清空 chip 欄位（避免先清欄位造成瞬間閃爍）
   clearImageAndState();
   setStatus("上傳中...");
@@ -570,6 +583,8 @@ sheetSelector.addEventListener("change", querySheetInfo);
 
 async function querySheetInfo(){
   hideDataControls();
+  hideLoadBtn();           // 註解：切表當下先把載入按鈕藏起來
+  
   if(!SESSION_ID || !sheetSelector.value) return;
   setError("");
   
@@ -585,26 +600,8 @@ async function querySheetInfo(){
   const data = await res.json();
   
   // 若這不是最後一次請求的回應 → 丟棄，避免舊回應覆蓋新狀態
-//  if (token !== CURRENT_SHEET_REQ) return;
-//  if(data.error){ setError(data.error); return; }
-//  
-//  if (data.chip_size && data.chip_size.width && data.chip_size.height) {
-//    chipWidthEl.value  = Number(data.chip_size.width).toFixed(3);  // um
-//    chipHeightEl.value = Number(data.chip_size.height).toFixed(3); // um
-//  
-//    // 依 630px/7mm 與 480px/5mm 直接換算
-//    const sz = sizeFromChipUm(data.chip_size.width, data.chip_size.height);
-//    chipImage.style.width  = sz.w + "px";
-//    chipImage.style.height = sz.h + "px";
-//  }
-//
-//  if(data.image_url){
-//	chipImage.classList.remove('loaded'); // 先移除，等 load 事件再顯示
-//    chipImage.src = data.image_url;       // 交給瀏覽器載入
-//  }else{
-//    chipImage.removeAttribute('src');
-//    chipImage.classList.remove('loaded'); // 保持隱藏，就不會出現「chip」字
-//  }
+  if (token !== CURRENT_SHEET_REQ) return;
+  if (data.error){ setError(data.error); return; }
 
     // === 依 chip size 是否有值，決定是否載入圖片 ===
     const w = Number(data?.chip_size?.width)  || 0;
@@ -624,8 +621,10 @@ async function querySheetInfo(){
       chipImage.style.width  = sz.w + "px";
       chipImage.style.height = sz.h + "px";
       if (data.image_url) {
-        chipImage.classList.remove('loaded');  // 成功 load 事件才顯示
-        chipImage.src = data.image_url;
+      chipImage.classList.remove('loaded');  // 成功後由 load 事件顯示 & 開啟按鈕
+      chipImage.removeAttribute('src');      // 先取消舊請求，降低競態
+      chipImage.dataset.req = String(token); // 標記此圖對應的請求序號
+      chipImage.src = data.image_url;        // 交給瀏覽器載入
       } else {
         clearImageAndState();                  // 保守：若無圖，同樣清乾淨
         setError("此工作表未找到可用圖片。");
@@ -743,6 +742,8 @@ window.addEventListener("wheel", (e) => {
 
 // 初始縮放顯示
 applyZoom(1.0);
+// 預設就隱藏載入按鈕，直到圖片真的載入成功
+hideLoadBtn();
 
 // Download
 document.getElementById("btnDownload").addEventListener("click", downloadPNG);
