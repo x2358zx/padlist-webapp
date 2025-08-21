@@ -31,6 +31,11 @@ function sizeFromChipUm(w_um, h_um) {
   return { w: wpx, h: hpx };
 }
 
+// ✨ 讓 MIN/MAX 能微調的邊界（單位：px，stage座標）
+let MINMAX_OFFSET = { left:0, right:0, top:0, bottom:0 };
+// 例：若圖片四邊各有 ~3px 留白，可改成 {left:3, right:3, top:3, bottom:3}
+
+
 // 位置函式
 function posLeftLabel(i){  return { x: LEFT_LABEL_X,  y: LEFT_Y0  + i*STEP_V }; }
 function posLeftInput(i){  return { x: LEFT_INPUT_X,  y: LEFT_Y0  + i*STEP_V }; }
@@ -188,6 +193,49 @@ function buildSideUI(){
   });
 }
 
+// 取得元素在「stage 原始座標」的外框（會把縮放/平移還原）
+function getStageRect(el) {
+  const lb = el.getBoundingClientRect();
+  const st = stage.getBoundingClientRect();
+  return {
+    left:   (lb.left   - st.left) / DISPLAY_SCALE,
+    top:    (lb.top    - st.top ) / DISPLAY_SCALE,
+    right:  (lb.right  - st.left) / DISPLAY_SCALE,
+    bottom: (lb.bottom - st.top ) / DISPLAY_SCALE,
+  };
+}
+
+// 量到四側 pin-box 內側的矩形（左=左排右緣、右=右排左緣、上=頂排下緣、下=底排上緣）
+function measureInnerPinFrame(){
+  const Ls = stage.querySelectorAll('.pin-box.side-left');
+  const Rs = stage.querySelectorAll('.pin-box.side-right');
+  const Ts = stage.querySelectorAll('.pin-box.side-top');
+  const Bs = stage.querySelectorAll('.pin-box.side-bottom');
+  if(!Ls.length || !Rs.length || !Ts.length || !Bs.length) return null;
+
+  let leftEdge = -Infinity, rightEdge = Infinity, topEdge = -Infinity, bottomEdge = Infinity;
+  Ls.forEach(b => { const r = getStageRect(b); leftEdge  = Math.max(leftEdge,  r.right); });
+  Rs.forEach(b => { const r = getStageRect(b); rightEdge = Math.min(rightEdge, r.left ); });
+  Ts.forEach(b => { const r = getStageRect(b); topEdge   = Math.max(topEdge,   r.bottom); });
+  Bs.forEach(b => { const r = getStageRect(b); bottomEdge= Math.min(bottomEdge,r.top   ); });
+
+  if(!(isFinite(leftEdge)&&isFinite(rightEdge)&&isFinite(topEdge)&&isFinite(bottomEdge))) return null;
+  return { x: leftEdge, y: topEdge, w: rightEdge - leftEdge, h: bottomEdge - topEdge };
+}
+
+// 依內框置中 chip 圖
+function centerChipImageInInnerFrame(){
+  const frame = measureInnerPinFrame();
+  if(!frame) return;
+  const chipW = parseFloat(chipImage.style.width)  || chipImage.width  || 0;
+  const chipH = parseFloat(chipImage.style.height) || chipImage.height || 0;
+  if(!chipW || !chipH) return;
+
+  chipImage.style.left = `${frame.x + (frame.w - chipW)/2}px`;
+  chipImage.style.top  = `${frame.y + (frame.h - chipH)/2}px`;
+}
+
+
 // 讓圖片成功載入才顯示；失敗就維持隱藏
 chipImage.addEventListener('load', () => {
   chipImage.classList.add('loaded');
@@ -242,12 +290,15 @@ function imgRect(){
 
 // 依圖片邊界自動設定 MIN/MAX：MIN=左下角、MAX=右上角
 function setMinMaxToImage() {
-  const r = imgRect();                   // {left, top, right, bottom, width, height}
+  const r = imgRect();
   if (!r.width || !r.height) return false;
-  MIN_POINT = { x: r.left,  y: r.bottom }; // 左下
-  MAX_POINT = { x: r.right, y: r.top    }; // 右上
+
+  const off = MINMAX_OFFSET;
+  MIN_POINT = { x: r.left  + off.left,  y: r.bottom - off.bottom }; // 左下往內縮
+  MAX_POINT = { x: r.right - off.right, y: r.top    + off.top    }; // 右上往內縮
   return true;
 }
+
 
 
 function chipToStage(x_um, y_um, chipW, chipH){
@@ -479,11 +530,6 @@ async function querySheetInfo(){
     const sz = sizeFromChipUm(data.chip_size.width, data.chip_size.height);
     chipImage.style.width  = sz.w + "px";
     chipImage.style.height = sz.h + "px";
-  
-    // 置中到 800×900 的 stage
-    const cw = sz.w, ch = sz.h;
-    chipImage.style.left = ((800 - cw) / 2) + "px";
-    chipImage.style.top  = ((900 - ch) / 2) + "px";
   }
 
   if(data.image_url){
@@ -497,6 +543,8 @@ async function querySheetInfo(){
 
   // rebuild UI (labels/inputs), clear overlay & pins
   buildSideUI();
+  // 依四側 pin-box 內側框置中 chip 圖
+  centerChipImageInInnerFrame();
   clearOverlay(); MIN_POINT = null; MAX_POINT = null;
   VALID_PINS = []; INVALID_PINS = [];
   invalidEl.textContent = "";
@@ -567,16 +615,152 @@ document.getElementById("loadDataBtn").addEventListener("click", async ()=>{
 //  drawPinsAndLines();
 //});
 
-// Zoom
-zoomRange.addEventListener("input", ()=>{
-  const val = Number(zoomRange.value);
-  zoomVal.textContent = Math.round(val*100) + "%";
-  stage.style.transform = `scale(${val})`;
-});
+// ====== Zoom（替代拉桿：Ctrl + 滾輪、Ctrl + +/-、Ctrl + 0） ======
+let CURRENT_ZOOM = 1.0;
+
+function applyZoom(z){
+  // 限制縮放範圍
+  CURRENT_ZOOM = Math.min(Math.max(z, 0.2), 3);
+  // 同步到 transform 與 DISPLAY_SCALE（幾何換算要用）
+  stage.style.transform = `scale(${CURRENT_ZOOM})`;
+  DISPLAY_SCALE = CURRENT_ZOOM;
+  // 更新畫面顯示
+  if (zoomVal) zoomVal.textContent = Math.round(CURRENT_ZOOM * 100) + "%";
+}
+
+// Ctrl + 滾輪
+window.addEventListener("wheel", (e) => {
+  if (e.ctrlKey) {
+    e.preventDefault(); // 阻止瀏覽器整頁縮放
+    const step = 0.05;
+    if (e.deltaY < 0) applyZoom(CURRENT_ZOOM + step); // 放大
+    else applyZoom(CURRENT_ZOOM - step);              // 縮小
+  }
+}, { passive: false });
+
+
+// 初始縮放顯示
+applyZoom(1.0);
 
 // Download
 document.getElementById("btnDownload").addEventListener("click", downloadPNG);
 document.getElementById("btnCopy").addEventListener("click", copyStageToClipboard);
+// --- MIN/MAX OFFSET UI wiring ---
+document.addEventListener('DOMContentLoaded', () => {
+  const offsetAll   = document.getElementById('offsetAll');
+  const offsetLink  = document.getElementById('offsetLink');
+  const offsetTop   = document.getElementById('offsetTop');
+  const offsetRight = document.getElementById('offsetRight');
+  const offsetBottom= document.getElementById('offsetBottom');
+  const offsetLeft  = document.getElementById('offsetLeft');
+  const offsetReset = document.getElementById('offsetReset');
+
+  const vAll   = document.getElementById('offsetAllValue');
+  const vTop   = document.getElementById('offsetTopValue');
+  const vRight = document.getElementById('offsetRightValue');
+  const vBottom= document.getElementById('offsetBottomValue');
+  const vLeft  = document.getElementById('offsetLeftValue');
+  const grid   = document.getElementById('offsetGrid');
+
+  function loadOffset() {
+    try {
+      const s = localStorage.getItem('minmax_offset');
+      if (!s) return;
+      const o = JSON.parse(s);
+      ['left','right','top','bottom'].forEach(k=>{
+        if (typeof o[k] === 'number') MINMAX_OFFSET[k] = o[k];
+      });
+    } catch(e){}
+  }
+
+  function saveOffset() {
+    localStorage.setItem('minmax_offset', JSON.stringify(MINMAX_OFFSET));
+  }
+
+  function syncUI() {
+    const eq = (MINMAX_OFFSET.left === MINMAX_OFFSET.right) &&
+               (MINMAX_OFFSET.left === MINMAX_OFFSET.top) &&
+               (MINMAX_OFFSET.left === MINMAX_OFFSET.bottom);
+    if (eq) {
+      offsetLink.checked = true;
+      offsetAll.value = MINMAX_OFFSET.left;
+      grid.style.display = 'none';
+    } else {
+      offsetLink.checked = false;
+      grid.style.display = 'grid';
+    }
+
+    offsetTop.value    = MINMAX_OFFSET.top;
+    offsetRight.value  = MINMAX_OFFSET.right;
+    offsetBottom.value = MINMAX_OFFSET.bottom;
+    offsetLeft.value   = MINMAX_OFFSET.left;
+
+    vAll.textContent    = offsetAll.value;
+    vTop.textContent    = offsetTop.value;
+    vRight.textContent  = offsetRight.value;
+    vBottom.textContent = offsetBottom.value;
+    vLeft.textContent   = offsetLeft.value;
+  }
+
+  function applyAndRedraw() {
+    saveOffset();
+    if (typeof setMinMaxToImage === 'function') setMinMaxToImage();
+    if (typeof drawPinsAndLines  === 'function') drawPinsAndLines();
+  }
+
+  // listeners
+  offsetAll?.addEventListener('input', e => {
+    const v = +e.target.value;
+    if (offsetLink.checked) {
+      MINMAX_OFFSET = { left:v, right:v, top:v, bottom:v };
+      syncUI();
+      applyAndRedraw();
+    }
+    vAll.textContent = v;
+  });
+
+  [ ['offsetTop','top'], ['offsetRight','right'],
+    ['offsetBottom','bottom'], ['offsetLeft','left']
+  ].forEach(([id, key])=>{
+    const el = document.getElementById(id);
+    el?.addEventListener('input', e => {
+      const v = +e.target.value;
+      MINMAX_OFFSET[key] = v;
+      if (offsetLink.checked) {
+        // 使用者動了單邊，就自動解鎖四邊連動
+        offsetLink.checked = false;
+        grid.style.display = 'grid';
+      }
+      syncUI();
+      applyAndRedraw();
+    });
+  });
+
+  offsetLink?.addEventListener('change', () => {
+    // 開啟連動時，用目前 all 的值覆蓋四邊
+    if (offsetLink.checked) {
+      const v = +offsetAll.value;
+      MINMAX_OFFSET = { left:v, right:v, top:v, bottom:v };
+      syncUI();
+      applyAndRedraw();
+    } else {
+      grid.style.display = 'grid';
+    }
+  });
+
+  offsetReset?.addEventListener('click', () => {
+    MINMAX_OFFSET = { left:0, right:0, top:0, bottom:0 };
+    syncUI();
+    applyAndRedraw();
+  });
+
+  // init
+  loadOffset();
+  syncUI();
+  // 首次載入就套用一次（若你要等圖片載好再套，可以把這行移到 onload 後）
+  applyAndRedraw();
+});
+
 
 // Initial side UI
 buildSideUI();
