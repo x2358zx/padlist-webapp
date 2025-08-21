@@ -327,3 +327,6 @@ border-radius:4px;
   justify-content:flex-end;
   margin-top:.25rem;
 }
+
+/* 確保 hidden 真的隱藏 */
+[hidden] { display: none !important; }

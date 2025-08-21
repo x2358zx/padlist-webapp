@@ -63,6 +63,11 @@ const sheetSelector = document.getElementById("sheetSelector");
 const zoomRange = document.getElementById("zoomRange");
 const zoomVal = document.getElementById("zoomVal");
 
+const dataControls = document.getElementById("dataControls");
+const hideDataControls   = () => dataControls?.setAttribute("hidden", "");
+const revealDataControls = () => dataControls?.removeAttribute("hidden");
+
+
 let SESSION_ID = null;
 let DISPLAY_SCALE = 1.0;
 let MIN_POINT = null; // {x,y}
@@ -474,6 +479,7 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
   if(!f){ return; }
   setError("");
   setStatus("上傳中...");
+  hideDataControls();
   const fd = new FormData();
   fd.append("file", f);
   const res = await fetch("/upload", { method:"POST", body: fd });
@@ -512,6 +518,7 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
 sheetSelector.addEventListener("change", querySheetInfo);
 
 async function querySheetInfo(){
+  hideDataControls();
   if(!SESSION_ID || !sheetSelector.value) return;
   setError("");
   const fd = new FormData();
@@ -579,6 +586,7 @@ document.getElementById("loadDataBtn").addEventListener("click", async ()=>{
   }
   
   drawPinsAndLines();
+  revealDataControls(); //把隱藏區域打開
 });
 
 // MIN/MAX selection
