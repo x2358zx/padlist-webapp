@@ -348,3 +348,11 @@ border-radius:4px;
   position: absolute;
   z-index: 2;
 }
+
+/* === 空白鍵拖曳平移的游標與選字控制 === */
+#stageWrapper.space-pan-ready { cursor: grab; }
+#stageWrapper.space-pan-active { cursor: grabbing; }
+#stageWrapper.space-pan-active, 
+#stage.space-pan-active {
+  user-select: none;
+}

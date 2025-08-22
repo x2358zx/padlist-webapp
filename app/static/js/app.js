@@ -21,8 +21,8 @@ const BOTTOM_LABEL_Y= 895, BOTTOM_INPUT_Y= 815, BOTTOM_X0= 125;  //（通常 +2~
 // === Pixel per micrometer (px/um) ===
 // 640 px ↔ 8.75 mm = 8750 um → 1 px/um（垂直:上盒最下邊 → 下盒最上邊內側距離）
 // 480 px ↔ 6.75 mm = 6750 um → 1 px/um（水平:左盒最右邊 → 右盒最左邊的內側距離）
-const PX_PER_UM_Y = 0.08;  //
-const PX_PER_UM_X = 0.08;  // 
+const PX_PER_UM_Y = 0.08;  //0.08
+const PX_PER_UM_X = 0.08;  //0.08
 
 // 把 chip 尺寸(um) 轉成 畫面像素(px)
 function sizeFromChipUm(w_um, h_um) {
@@ -72,6 +72,8 @@ const loadDataBtn = document.getElementById("loadDataBtn");
 // 專用：隱藏/顯示載入按鈕（同時設 disabled，避免被鍵盤觸發）
 const hideLoadBtn   = () => { loadDataBtn?.setAttribute("hidden",""); loadDataBtn.disabled = true;  };
 const revealLoadBtn = () => { loadDataBtn?.removeAttribute("hidden");  loadDataBtn.disabled = false; };
+
+const stageWrapper = document.getElementById("stageWrapper"); // 平移手勢掛在外層容器
 
 
 let SESSION_ID = null;
@@ -719,50 +721,13 @@ document.getElementById("loadDataBtn").addEventListener("click", async ()=>{
   revealDataControls(); //把隱藏區域打開
 });
 
-// MIN/MAX selection
-//let activeSelect = null; // "min" | "max" | null
-//document.getElementById("btnMin").addEventListener("click", ()=>{
-//  activeSelect = "min";
-//  setStatus("請在畫布上點選 MIN(左下)");
-//});
-//document.getElementById("btnMax").addEventListener("click", ()=>{
-//  activeSelect = "max";
-//  setStatus("請在畫布上點選 MAX(右上)");
-//});
-//document.getElementById("btnReset").addEventListener("click", ()=>{
-//  activeSelect = null; MIN_POINT = null; MAX_POINT = null;
-//  clearOverlay();
-//  buildSideUI(); // also reset bold style
-//  setStatus("已重置座標");
-//});
-
-// Click inside stage to set min/max
-//stage.addEventListener("click", (ev)=>{
-//  if(!activeSelect) return;
-//  const rect = stage.getBoundingClientRect();
-//  const x = (ev.clientX - rect.left) / DISPLAY_SCALE;
-//  const y = (ev.clientY - rect.top) / DISPLAY_SCALE;
-//  if(activeSelect === "min"){
-//    MIN_POINT = {x, y};
-//    setStatus("已設置 MIN 點");
-//  }else if(activeSelect === "max"){
-//    MAX_POINT = {x, y};
-//    setStatus("已設置 MAX 點");
-//  }
-//  activeSelect = null;
-//  drawPinsAndLines();
-//});
-
-// ====== Zoom（替代拉桿：Ctrl + 滾輪、Ctrl + +/-、Ctrl + 0） ======
-let CURRENT_ZOOM = 1.0;
+// === Pan/Zoom 狀態（空白鍵拖曳平移、Ctrl+滾輪縮放） ===
+let CURRENT_ZOOM = 1.0;     // 既有：縮放倍率
 
 function applyZoom(z){
-  // 限制縮放範圍
   CURRENT_ZOOM = Math.min(Math.max(z, 0.2), 3);
-  // 同步到 transform 與 DISPLAY_SCALE（幾何換算要用）
-  stage.style.transform = `scale(${CURRENT_ZOOM})`;
+  stage.style.transform = `scale(${CURRENT_ZOOM})`; // 只縮放，不平移
   DISPLAY_SCALE = CURRENT_ZOOM;
-  // 更新畫面顯示
   if (zoomVal) zoomVal.textContent = Math.round(CURRENT_ZOOM * 100) + "%";
 }
 
@@ -776,6 +741,65 @@ window.addEventListener("wheel", (e) => {
   }
 }, { passive: false });
 
+// === 空白鍵 + 拖曳：平移畫面 ===
+let isSpaceDown = false;
+let isPanning   = false;
+let panStart = { x:0, y:0 };      // 滑鼠按下座標（視窗座標）
+let panOrigin = { x:0, y:0 };     // 當下 PAN_X/Y
+
+// 工具：判斷是否在輸入控件上（避免擋住輸入空白）
+function inEditable(el){
+  return el && (
+    el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ||
+    el.isContentEditable
+  );
+}
+
+window.addEventListener('keydown', (e)=>{
+  if ((e.code === 'Space' || e.key === ' ') && !inEditable(e.target)) {
+    e.preventDefault(); // 避免空白鍵捲動頁面/觸發按鈕 click
+    isSpaceDown = true;
+    stageWrapper.classList.add('space-pan-ready'); // 換成「🖐 可拖動」游標
+  }
+});
+
+window.addEventListener('keyup', (e)=>{
+  if (e.code === 'Space' || e.key === ' ') {
+    isSpaceDown = false;
+    if (!isPanning) stageWrapper.classList.remove('space-pan-ready');
+  }
+});
+
+// 只在畫布容器內支援拖曳
+stageWrapper.addEventListener('mousedown', (e)=>{
+  if (!isSpaceDown) return;
+  e.preventDefault();
+  isPanning = true;
+  stageWrapper.classList.add('space-pan-active');
+  panStart = { x: e.clientX, y: e.clientY };
+});
+
+window.addEventListener('mousemove', (e)=>{
+  if (!isPanning) return;
+  const dx = e.clientX - panStart.x;
+  const dy = e.clientY - panStart.y;
+
+  const scroller = document.scrollingElement || document.documentElement;
+  scroller.scrollLeft -= dx;   // ← 往滑鼠反方向捲動，視覺上就是「拖畫面」
+  scroller.scrollTop  -= dy;
+
+  panStart = { x: e.clientX, y: e.clientY }; // 基準改成目前位置
+});
+
+
+window.addEventListener('mouseup', ()=>{
+  if (isPanning) {
+    isPanning = false;
+    stageWrapper.classList.remove('space-pan-active');
+    // 若空白鍵還按著，保留「ready」游標；放開空白鍵就移除
+    if (!isSpaceDown) stageWrapper.classList.remove('space-pan-ready');
+  }
+});
 
 // 初始縮放顯示
 applyZoom(1.0);
@@ -899,7 +923,49 @@ document.addEventListener('DOMContentLoaded', () => {
   syncUI();
   // 首次載入就套用一次（若你要等圖片載好再套，可以把這行移到 onload 後）
   applyAndRedraw();
+  
+  // === Shift + 滾輪：調整「邊界內縮」 ===
+// 規則：
+// 1) 有焦點的拉桿（上/右/下/左/全部）優先被調整
+// 2) 沒有焦點：若「四邊連動」開啟 → 同步調整四邊；未連動 → 四邊同值微調
+// 3) 每格步進 1px，範圍 0~30（與 UI 一致）
+stageWrapper.addEventListener('wheel', (e) => {
+  if (!e.shiftKey || e.ctrlKey) return;   // 只處理 Shift，避免和 Ctrl+滾輪縮放衝突
+  e.preventDefault();
+
+  const step = (e.deltaY < 0) ? +1 : -1;
+  const clamp = (n)=> Math.max(0, Math.min(30, n));
+  const ids = ['offsetAll','offsetTop','offsetRight','offsetBottom','offsetLeft'];
+
+  const ae = document.activeElement;
+  const focusedId = (ae && ids.includes(ae.id)) ? ae.id : null;
+
+  if (focusedId && focusedId !== 'offsetAll') {
+    if (focusedId === 'offsetTop')    MINMAX_OFFSET.top    = clamp(MINMAX_OFFSET.top    + step);
+    if (focusedId === 'offsetRight')  MINMAX_OFFSET.right  = clamp(MINMAX_OFFSET.right  + step);
+    if (focusedId === 'offsetBottom') MINMAX_OFFSET.bottom = clamp(MINMAX_OFFSET.bottom + step);
+    if (focusedId === 'offsetLeft')   MINMAX_OFFSET.left   = clamp(MINMAX_OFFSET.left   + step);
+  } else {
+    if (offsetLink.checked) {
+      const v = clamp(MINMAX_OFFSET.left + step);
+      MINMAX_OFFSET = { left:v, right:v, top:v, bottom:v };
+      offsetAll.value = v; // 同步主拉桿
+    } else {
+      MINMAX_OFFSET = {
+        left:   clamp(MINMAX_OFFSET.left   + step),
+        right:  clamp(MINMAX_OFFSET.right  + step),
+        top:    clamp(MINMAX_OFFSET.top    + step),
+        bottom: clamp(MINMAX_OFFSET.bottom + step),
+      };
+    }
+  }
+  syncUI();          // ← 這裡會同步數值膠囊(vAll/vTop/...)
+  applyAndRedraw();  // ← 存 localStorage、重算 MIN/MAX、重畫 overlay
+}, { passive:false });
+
 });
+
+
 
 
 // Initial side UI
