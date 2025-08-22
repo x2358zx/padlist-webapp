@@ -5,7 +5,7 @@ const topLabels   = ["P","O","N","96","95","94","93","92","91","87","85","83","8
 const bottomLabels= ["E","31","32","33","35","36","37","40","41","44","45","46","47","49","50","F"];
 
 // === Drawing size constants ===
-const PIN_DOT_RADIUS = 2;   // 紅點跟藍點的大小，原本是 4，改小點
+const PIN_DOT_RADIUS = 1.5;   // 紅點跟藍點的大小，原本是 4，改小點
 const PIN_LINE_WIDTH = 1.5; // 連線大小，原本是 2
 
 // === Label layout knobs ===
@@ -54,6 +54,8 @@ const statusEl = document.getElementById("status");
 const errorEl = document.getElementById("error");
 const invalidEl = document.getElementById("invalidPins");
 const projectCodeEl = document.getElementById("projectCode");
+const padwindowEl   = document.getElementById("padwindow");   // ★ 新增
+const cupEl         = document.getElementById("cup");         // ★ 新增
 
 const chipWidthEl = document.getElementById("chipWidth");
 const chipHeightEl = document.getElementById("chipHeight");
@@ -87,6 +89,7 @@ let CURRENT_SHEET_REQ = 0; // === Sheet 切換請求序號：只採用最後一�
 
 const inputsByLabel = new Map(); // label string -> input element
 const labelDivsByLabel = new Map(); // label string -> label element
+const inputsByLabelNorm = new Map();   // 正規化鍵
 
 // ====== Helpers ======
 function setStatus(msg){ statusEl.textContent = msg; }
@@ -97,6 +100,14 @@ function nowTime(){
   return `${dt.getFullYear()}/${pad(dt.getMonth()+1)}/${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 document.getElementById("nowtime").textContent = nowTime();
+
+function normLabel(s){
+  return String(s || "")
+    .replace(/\s+/g, "")      // 去所有空白（含全形空白）
+    .replace(/\u00A0/g, "")   // 去 NBSP
+    .toUpperCase();           // 大寫化
+}
+
 
 function sanitizeNumberInput(el){
   el.addEventListener("input", () => {
@@ -176,6 +187,7 @@ function buildSideUI(){
     box.style.top  = I.y + "px";
     stage.appendChild(box);
     inputsByLabel.set(lab, box);
+	inputsByLabelNorm.set(normLabel(lab), box);
   });
 
   // Right
@@ -197,6 +209,7 @@ function buildSideUI(){
 	box.style.top = I.y + "px";
     stage.appendChild(box);
     inputsByLabel.set(lab, box);
+	inputsByLabelNorm.set(normLabel(lab), box);
   });
 
   // Top
@@ -217,6 +230,7 @@ function buildSideUI(){
 	box.style.top = I.y + "px";
     stage.appendChild(box);
     inputsByLabel.set(lab, box);
+	inputsByLabelNorm.set(normLabel(lab), box);
   });
 
   // Bottom
@@ -237,6 +251,7 @@ function buildSideUI(){
 	box.style.top = I.y + "px";
     stage.appendChild(box);
     inputsByLabel.set(lab, box);
+	inputsByLabelNorm.set(normLabel(lab), box);
   });
 }
 
@@ -259,6 +274,8 @@ function clearImageAndState(){
   // chip 尺寸欄位與圖片尺寸歸零（保險）
   // 清空 Project Code（一起清掉舊專案代碼顯示）
   projectCodeEl.textContent = "";
+  padwindowEl.textContent   = "";   // ★ 新增
+  cupEl.textContent         = "";   // ★ 新增
   hideDataControls();
   hideLoadBtn(); // 註解：清畫面時一併把「載入資料」按鈕隱藏，避免殘留
 }
@@ -415,10 +432,14 @@ function processPinDataToInputs(){
   const trulyValid = [];
 
   VALID_PINS.forEach(p => {
-    const el = inputsByLabel.get(p.pin_no);
+    const key = normLabel(p.pin_no);
+    const el = inputsByLabel.get(p.pin_no) || inputsByLabelNorm.get(key);
+
     if(el){
       // 如果有對應的 label 才算是有效 PIN
-      el.textContent = p.pin_name || "";
+      const showName = (p.pin_name || "").trim();
+      el.textContent = showName;
+      const msg = `${p.pin_no}, ${showName}`;
       trulyValid.push(p);
     }else{
       // 沒有 label 的就丟到 INVALID_PINS
@@ -485,7 +506,7 @@ function drawPinsAndLines(){
     drawCircle(pt.x, pt.y, PIN_DOT_RADIUS, "#f00", `PIN_${p.pin_no}`);
 
     // 以「pin 盒子 .pin-box」為對象，連到內側邊緣
-    const boxEl = inputsByLabel.get(p.pin_no);
+    const boxEl = inputsByLabel.get(p.pin_no) || inputsByLabelNorm.get(normLabel(p.pin_no));
     if (boxEl) {
       const anchor = innerAnchorOfBox(boxEl); // 內側錨點
       drawLine(pt.x, pt.y, anchor.x, anchor.y, "#f00", PIN_LINE_WIDTH, `LINE_${p.pin_no}`);
@@ -577,17 +598,6 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
     sheetSelector.appendChild(opt);
   });
 
-//  // handle no sheets
-//  if(!sheetSelector.options.length){
-//    setError("沒有偵測到有效工作表，已列出為空。\n請確認：\n1) 試著切換到有資料的工作表再存檔再上傳\n2) 或把範例檔給我，我會調整偵測規則");
-//  }
-//  // set image (if any)
-//  if(data.image_url){
-//    chipImage.src = data.image_url;
-//  }else{
-//    chipImage.removeAttribute("src");
-//  }
-
   // 若沒有任何含圖的工作表 → 顯示提示並維持空畫面
   if(!sheetSelector.options.length){
     setError("這個檔案內沒有任何『含圖片』的工作表：\n請在 Excel 中插入圖片（插入→圖片），存檔後再上傳。");
@@ -595,15 +605,6 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
     chipImage.classList.remove("loaded");
     return;
   }
-  //註解:避免在還不知道 chip size 時就先顯示圖片（會被下一步清掉而閃一下）
-  // 初始：顯示第一個有圖工作表的「最大張」圖片
-  //if (data.default_image_url) {
-  //  chipImage.classList.remove('loaded');
-  //  chipImage.src = data.default_image_url;
-  //} else {
-  //  chipImage.removeAttribute("src");
-  //  chipImage.classList.remove("loaded");
-  //}
 
   // auto query sheet info
   if(sheetSelector.value){
@@ -626,8 +627,6 @@ async function querySheetInfo(){
   const fd = new FormData();
   fd.append("session_id", SESSION_ID);
   fd.append("sheet_name", sheetSelector.value);
-  fd.append("chip_size_cell", document.getElementById("chipCell").value || "C3");
-  fd.append("project_code_cell", document.getElementById("projectCell").value || "C2");
   const res = await fetch("/sheet_info", { method:"POST", body: fd });
   const data = await res.json();
   
@@ -670,6 +669,16 @@ async function querySheetInfo(){
       }
     }
   projectCodeEl.textContent = data.project_code || "";
+  
+  // ★ 新增：把 PadWindow / CUP 寫進膠囊
+  if (data.extras) {
+    padwindowEl.textContent = data.extras.PadWindow || "";
+    cupEl.textContent       = data.extras.CUP       || "";
+  } else {
+    padwindowEl.textContent = "";
+    cupEl.textContent       = "";
+  }
+
 
   // rebuild UI (labels/inputs), clear overlay & pins
   buildSideUI();
@@ -696,11 +705,6 @@ document.getElementById("loadDataBtn").addEventListener("click", async ()=>{
   const fd = new FormData();
   fd.append("session_id", SESSION_ID);
   fd.append("sheet_name", sheetSelector.value);
-  fd.append("pin_no_col", document.getElementById("pinNoCol").value || "B");
-  fd.append("pin_name_col", document.getElementById("pinNameCol").value || "C");
-  fd.append("x_col", document.getElementById("xCol").value || "D");
-  fd.append("y_col", document.getElementById("yCol").value || "E");
-  fd.append("start_row", document.getElementById("startRow").value || "8");
   const res = await fetch("/parse_pins", { method:"POST", body: fd });
   const data = await res.json();
   if(data.error){ setError(data.error); return; }

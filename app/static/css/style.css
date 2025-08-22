@@ -47,11 +47,7 @@ main { display:grid; grid-template-columns: 420px 1fr; gap: 16px; }
 
 .right-pane .project-code { margin-bottom: 8px; }
 #stageWrapper { border:1px solid #e1e1e1; border-radius:12px; padding:8px; background:#fafafa; width: fit-content; }
-.stage { position: relative; width:800px; height:900px; background:white; overflow:hidden; transform-origin: 0 0; }
-.chip-image {
-  position: absolute;   /* 一定要是 absolute */
-  /* left/top 會被你那段 JS 置中計算覆寫 */
-}
+.stage { position: relative; background:white; overflow:hidden; transform-origin: 0 0; }
 
 .overlay { 
   position:absolute; 
@@ -119,7 +115,11 @@ border-radius:4px;
 /* 若你有分邊位移（只影響畫面，不影響截圖），保留原本的 side-* 規則即可 */
 
 /* 先隱藏圖片，等成功載入再顯示 */
-.chip-image { display: none; position: absolute; }
+.chip-image {
+	display: none;
+	position: absolute;
+	z-index: 2;/* 讓圖片的 z-index 比背景高，確保能蓋住 */
+	}
 .chip-image.loaded { display: block; }
 
 
@@ -139,6 +139,13 @@ border-radius:4px;
   gap: 8px;
   z-index: 20;
   pointer-events: none;
+}
+
+/* ★ 新增：PadWindow/CUP 膠囊排（放在 Project Code 上方） */
+.stage-hud.meta-hud{
+  bottom: 50px;                 /* 比下方那排（bottom:8px）再上移 ~42px */
+  justify-content: flex-start;  /* 貼左 */
+  gap: 8px;
 }
 
 /* 膠囊本體：固定高度，文字垂直置中 */
@@ -170,6 +177,11 @@ border-radius:4px;
 
 /* 時間固定寬度、不被擠壓 */
 .stage-hud .nowtime{ flex: 0 0 auto; }
+
+.stage-hud.meta-hud .hud-item{
+  min-width: 140px;             /* 視覺穩定（可依實際文字長度微調） */
+}
+
 
 /* 避免繼承到 header 的 margin 規則 */
 .stage .nowtime, .stage .project-code { margin: 0; }
@@ -221,12 +233,6 @@ border-radius:4px;
 /* 沒內容就自動隱藏第二顆 */
 .status-bar .status:empty{ display: none; }
 
-/* 用偽元素來顯示文字，讓 HTML 乾淨 */
-#imagePlaceholder::before {
-  content: "請從左側上傳 Excel 檔案\A 系統將自動載入對應的 Chip 圖片";
-  white-space: pre; /* 讓 \A 換行符號生效 */
-  line-height: 1.6;
-}
 
 /* style.css */
 .left-pane input[readonly]{
@@ -341,12 +347,6 @@ border-radius:4px;
   
   /* 確保它在最底層，圖片會蓋在它上面 */
   z-index: 1;
-}
-
-/* 讓圖片的 z-index 比背景高，確保能蓋住 */
-.chip-image {
-  position: absolute;
-  z-index: 2;
 }
 
 /* === 空白鍵拖曳平移的游標與選字控制 === */

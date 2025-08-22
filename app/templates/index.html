@@ -59,8 +59,9 @@
 
 
 
-        <div class="section">
-          <div class="section-title">欄位設定</div>
+        <!-- ★ 改成自動偵測：這段預設隱藏，如需除錯再拿掉 hidden -->
+        <div class="section" hidden>
+          <div class="section-title">欄位設定（已改為自動偵測）</div>
           <div class="grid-2">
             <label>Chip Size 儲存格：</label><input id="chipCell" type="text" value="C3"/>
             <label>Project Code 儲存格：</label><input id="projectCell" type="text" value="C2"/>
@@ -70,8 +71,8 @@
             <label>Y座標欄位：</label><input id="yCol" type="text" value="E"/>
             <label>資料起始行：</label><input id="startRow" type="number" value="8"/>
           </div>
-
         </div>
+
 <div id="dataControls" hidden>
         <div class="coord-controls">
 		<!--
@@ -147,10 +148,16 @@
       <section class="right-pane">
         <!-- 主畫布容器（含標籤、文字框、圖片、疊加SVG） -->
         <div id="stageWrapper">
-          <div id="stage" class="stage" style="width:780px;height:950px;">
+          <div id="stage" class="stage" style="width:780px;height:1000px;">
             <img id="chipImage" class="chip-image" alt="chip" />
-            <svg id="overlay" class="overlay" width="780" height="950"></svg>
+            <svg id="overlay" class="overlay" width="780" height="1000"></svg>
 			
+			<!-- ★ 新增：PadWindow / CUP 膠囊（與 Project Code 膠囊同樣風格） -->
+			<div class="stage-hud meta-hud">
+			  <div class="hud-item"><span>PadWindow：</span><b id="padwindow"></b></div>
+			  <div class="hud-item"><span>CUP：</span><b id="cup"></b></div>
+			</div>
+
 			<!-- 新增：畫布 HUD（左：Project Code；右：時間） -->
 			<div class="stage-hud">
 			  <div class="hud-item project-code"><span>Project Code：</span><b id="projectCode"></b></div>

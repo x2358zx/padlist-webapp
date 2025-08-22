@@ -17,6 +17,7 @@ from PIL import Image
 import json
 import posixpath as pp
 import xml.etree.ElementTree as ET
+import re
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -186,6 +187,69 @@ def _read_cell_text(ws, cell_addr: str) -> str:
         pass
     return ""
 
+# === 自動偵測小工具（中文註解） ===
+def _scan_text(ws, max_rows=120, max_cols=40):
+    """把前 max_rows × max_cols 的儲存格掃一遍，回傳 (r,c,文字) 的生成器。"""
+    for r in range(1, max_rows + 1):
+        for c in range(1, max_cols + 1):
+            v = ws.cell(row=r, column=c).value
+            if v not in (None, ""):
+                yield r, c, str(v).strip()
+
+def _find_cell(ws, keywords, **kw):
+    """在頁面左上角區域找『包含 keywords 任一關鍵字』的儲存格。
+    回傳 (row, col)；多筆時採『最靠上、再最靠左』的那一格。"""
+    if isinstance(keywords, str):
+        keywords = [keywords]
+    kws = [k.lower() for k in keywords]
+    best = None
+    for r, c, s in _scan_text(ws, **kw):
+        s_low = s.lower()
+        if any(k in s_low for k in kws):
+            if best is None or (r < best[0] or (r == best[0] and c < best[1])):
+                best = (r, c)
+    return best
+
+# 文字正規化：去掉非英數，轉小寫，便於比對「等於」
+def _norm(s: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '', s.lower()) if s else ''
+
+def _find_header_exact(ws, patterns, **kw):
+    """
+    找『完全等於』其中一個 pattern（比對用 _norm）
+    例如：patterns=["pin", "pinno", "pin#"]，就不會把 "Pin Name" 誤判成 "Pin"
+    """
+    pats = [_norm(p) for p in (patterns if isinstance(patterns, (list, tuple)) else [patterns])]
+    best = None
+    for r, c, s in _scan_text(ws, **kw):
+        if _norm(s) in pats:
+            if best is None or (r < best[0] or (r == best[0] and c < best[1])):
+                best = (r, c)
+    return best
+
+
+def _col_letter(cidx: int) -> str:
+    from openpyxl.utils import get_column_letter
+    return get_column_letter(cidx)
+
+def _find_header_exact_in_row(ws, patterns, row, col_from=1, col_to=None):
+    """只在 row 這一列找『完全等於 patterns 之一』的表頭。會回傳 (row, col)。"""
+    if isinstance(patterns, (list, tuple)):
+        pats = [_norm(p) for p in patterns]
+    else:
+        pats = [_norm(patterns)]
+    if row < 1 or row > (ws.max_row or 0):
+        return None
+    if col_to is None:
+        col_to = min(ws.max_column or 0, 100)
+
+    for c in range(max(1, col_from), col_to + 1):
+        v = ws.cell(row=row, column=c).value
+        if v not in (None, "") and _norm(str(v)) in pats:
+            return (row, c)
+    return None
+
+
 def _extract_first_image_from_xlsx(xlsx_path: str, out_dir: str) -> Optional[str]:
     # 直接從 zip 取 xl/media/* 第一張
     try:
@@ -264,8 +328,6 @@ async def serve_upload(sid: str, fname: str):
 async def sheet_info(
     session_id: str = Form(...),
     sheet_name: str = Form(...),
-    chip_size_cell: str = Form("C3"),
-    project_code_cell: str = Form("C2"),
 ):
     sess_dir = os.path.join(UPLOAD_DIR, session_id)
     xlsx_path = os.path.join(sess_dir, "workbook.xlsx")
@@ -277,27 +339,36 @@ async def sheet_info(
         return JSONResponse({"error": "sheet not found"}, status_code=404)
     ws = wb[sheet_name]
 
-    # 解析 chip size (e.g. "123 um x 456 um")
-    import re
-    text = _read_cell_text(ws, chip_size_cell)
+    # === 自動偵測：Chip Size / Project Code / PadWindow / CUP（中文註解） ===
+    # 1) Chip Size：找含「chip size」的關鍵字，往右一格讀取文字並解析 "123 um x 456 um"
+    cs_pos = _find_cell(ws, ["chip size", "chipsize", "chip-size"])
     width = height = None
-    m = re.search(r"(\d+\.?\d*)\s*um\s*[X×x]\s*(\d+\.?\d*)\s*um", str(text))
-    if m:
-        width = float(m.group(1))
-        height = float(m.group(2))
+    if cs_pos:
+        r, c = cs_pos
+        cell_txt = _read_cell_text(ws, f"{_col_letter(c+1)}{r}")
+        m = re.search(r"(\d+\.?\d*)\s*um\s*[X×x]\s*(\d+\.?\d*)\s*um", str(cell_txt))
+        if m:
+            width = float(m.group(1))
+            height = float(m.group(2))
 
-    project_code = _read_cell_text(ws, project_code_cell)
+    # 2) Project Code：找到「Name」關鍵字，往右一格
+    proj_pos = _find_cell(ws, ["name"])
+    project_code = None
+    if proj_pos:
+        r, c = proj_pos
+        project_code = _read_cell_text(ws, f"{_col_letter(c+1)}{r}") or ""
 
-    # 圖片 URL（若未抽取過則再抽一次）
-    #img_path = None
-    #for ext in (".png", ".jpg", ".jpeg"):
-    #    candidate = os.path.join(sess_dir, f"chip_image{ext}")
-    #    if os.path.exists(candidate):
-    #        img_path = candidate
-    #        break
-    #if img_path is None:
-    #    img_path = _extract_first_image_from_xlsx(xlsx_path, sess_dir)
-    #img_url = f"/uploads/{session_id}/" + os.path.basename(img_path) if img_path else None
+    # 3) PadWindow / CUP：各自往右一格（可選）
+    padwindow = cup = None
+    pw_pos = _find_cell(ws, ["padwindow", "pad window"])
+    if pw_pos:
+        r, c = pw_pos
+        padwindow = _read_cell_text(ws, f"{_col_letter(c+1)}{r}") or ""
+    cup_pos = _find_cell(ws, ["cup"])
+    if cup_pos:
+        r, c = cup_pos
+        cup = _read_cell_text(ws, f"{_col_letter(c+1)}{r}") or ""
+
 
     # 依工作表回傳對應的「最大張圖片」
     mapping_json = os.path.join(sess_dir, "sheet_images.json")
@@ -315,18 +386,14 @@ async def sheet_info(
     return JSONResponse({
         "chip_size": {"width": width, "height": height},
         "project_code": project_code,
-        "image_url": img_url
+        "image_url": img_url,
+        "extras": {"PadWindow": padwindow, "CUP": cup}
     })
 
 @app.post("/parse_pins")
 async def parse_pins(
     session_id: str = Form(...),
     sheet_name: str = Form(...),
-    pin_no_col: str = Form("B"),
-    pin_name_col: str = Form("C"),
-    x_col: str = Form("D"),
-    y_col: str = Form("E"),
-    start_row: int = Form(8),
 ):
     sess_dir = os.path.join(UPLOAD_DIR, session_id)
     xlsx_path = os.path.join(sess_dir, "workbook.xlsx")
@@ -340,38 +407,110 @@ async def parse_pins(
     if ws.max_row is None or ws.max_row == 0:
         return JSONResponse({"valid_pins": [], "invalid_pins": []})
 
-    valid_pins = []
-    invalid_pins = []
+        # === 自動偵測：PIN / Text Name / X-axis / Y-axis 四個欄位置與起始列 ===
+    # 容許不同寫法（大小寫/空白/破折號）
+    pin_hdr = _find_header_exact(ws, ["pin", "pinno", "pin#", "pinno."])
+    name_hdr = _find_header_exact(ws, ["textname", "pinname", "name"])
+    x_hdr   = _find_header_exact(ws, ["xaxis", "x-axis", "x"])
+    y_hdr   = _find_header_exact(ws, ["yaxis", "y-axis", "y"])
+
+        # === 讓 Name 表頭「靠近 PIN/X/Y 所在的表頭列」 ===
+    header_row_guess = max(pin_hdr[0], x_hdr[0], y_hdr[0])  # 多半同列，取最大那列當表頭列
+
+    # 先嘗試：只在這一列找 name 表頭
+    name_near = _find_header_exact_in_row(ws, ["textname", "pinname", "name"], header_row_guess)
+    if not name_near:
+        # 再放寬到 ±2 列
+        for dr in ( -1, 1, -2, 2 ):
+            cand = _find_header_exact_in_row(ws, ["textname", "pinname", "name"], header_row_guess + dr)
+            if cand:
+                name_near = cand
+                break
+    if name_near:
+        name_hdr = name_near
+
+    # 若 name 跟 pin 還是在同一欄，優先從「同列表頭、pin 右邊」再找一次
+    if name_hdr and pin_hdr and name_hdr[1] == pin_hdr[1]:
+        cand = _find_header_exact_in_row(ws, ["textname", "pinname", "name"],
+                                         header_row_guess, col_from=pin_hdr[1] + 1)
+        if cand:
+            name_hdr = cand
+
+
+    # 若 pin_hdr 與 name_hdr 指到同一格（例如標頭是 "Pin Name"）
+    if pin_hdr and name_hdr and pin_hdr == name_hdr:
+        hdr_txt = _read_cell_text(ws, f"{_col_letter(pin_hdr[1])}{pin_hdr[0]}")
+        if "name" in (hdr_txt or "").lower():
+            # 這格應該歸「Name」，重新搜「Pin No」但限定只找 "PIN/PIN NO/PIN#"
+            pin_hdr = _find_header_exact(ws, ["pin", "pinno", "pin#", "pinno."])
+
+    if not (pin_hdr and name_hdr and x_hdr and y_hdr):
+        return JSONResponse({"valid_pins": [], "invalid_pins": ["未偵測到表頭（PIN/Name/X-axis/Y-axis）"]})
+        
+
+    # 取「最靠下的表頭列」+1 作為資料起始列（避免表頭不在同一列的情況）
+    start_row = max(pin_hdr[0], name_hdr[0], x_hdr[0], y_hdr[0]) + 1
+
+    from openpyxl.utils import get_column_letter
+    col_pin = get_column_letter(pin_hdr[1])
+    col_nam = get_column_letter(name_hdr[1])
+    col_x   = get_column_letter(x_hdr[1])
+    col_y   = get_column_letter(y_hdr[1])
 
     def read_cell(col_letter: str, row_idx: int) -> str:
         try:
-            return str(ws[f"{col_letter}{row_idx}"].value or "").strip()
+            v = ws[f"{col_letter}{row_idx}"].value
+            s = "" if v in (None, "") else str(v)
+            # 🆕 去掉 NBSP(\u00A0) 與全形空白(\u3000)，再 strip
+            return s.replace("\u00A0", "").replace("\u3000", "").strip()
         except Exception:
             return ""
 
-    for r in range(start_row, ws.max_row + 1):
-        pin_no = read_cell(pin_no_col, r)
-        pin_name = read_cell(pin_name_col, r)
-        x_text = read_cell(x_col, r).replace(" ", "")
-        y_text = read_cell(y_col, r).replace(" ", "")
+    valid_pins, invalid_pins = [], []
 
-        if pin_no == "" and pin_name == "":
+    r = start_row
+    while r <= ws.max_row:
+        pin_no   = read_cell(col_pin, r)
+        pin_name = read_cell(col_nam, r)
+        num = lambda s: re.sub(r"[^0-9.+-]", "", (s or ""))
+        x_text = num(read_cell(col_x, r))
+        y_text = num(read_cell(col_y, r))
+
+
+        # 停止條件：四欄都空白 → 結束掃描
+        if pin_no == "" and pin_name == "" and x_text == "" and y_text == "":
+            break
+
+        # === 決定這列的「身分」 ===
+        has_id = (pin_no != "" or pin_name != "")   # 🆕 只要 PIN 或 NAME 有其一
+        has_xy = (x_text != "" or y_text != "")
+
+        # 兩欄都空白，但座標有東西 → 視為雜訊列，直接跳過
+        if not has_id and has_xy:
+            r += 1
             continue
 
-        # NC 或 無效
+        # 嘗試把座標轉 float
         try:
             x = float(x_text)
             y = float(y_text)
         except Exception:
             x = y = None
 
-        if pin_no == "" or pin_name.upper() == "NC" or x is None or y is None:
-            invalid_pins.append(f"{pin_no}, {pin_name}")
-            continue
+        # 強化 NC 偵測（N/C、n c…都抓得到）
+        norm_name = re.sub(r'[^a-z]', '', (pin_name or '').lower())
+        is_nc = (norm_name == "nc")
 
-        # 清理名稱（去除空格）
-        cleaned_name = pin_name.replace(" ", "")
-        valid_pins.append({"pin_no": pin_no, "pin_name": cleaned_name, "x": x, "y": y})
+        # === 加入 invalid 或 valid 的規則 ===
+        if (pin_no == "" or is_nc or x is None or y is None):
+            # 🆕 只有當「至少有 PIN 或 NAME 其中一個」才列入 invalid_pins
+            if has_id:
+                invalid_pins.append(f"{pin_no}, {(pin_name or '').strip()}")
+        else:
+            cleaned_name = (pin_name or "").replace(" ", "")
+            valid_pins.append({"pin_no": pin_no, "pin_name": cleaned_name, "x": x, "y": y})
+
+        r += 1
 
     return JSONResponse({"valid_pins": valid_pins, "invalid_pins": invalid_pins})
 
