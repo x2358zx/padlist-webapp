@@ -890,27 +890,28 @@ function inEditable(el){
   );
 }
 
-window.addEventListener('keydown', (e)=>{
-  if ((e.code === 'Space' || e.key === ' ') && !inEditable(e.target)) {
-    e.preventDefault(); // 避免空白鍵捲動頁面/觸發按鈕 click
-    isSpaceDown = true;
-    stageWrapper.classList.add('space-pan-ready'); // 換成「🖐 可拖動」游標
-  }
-});
-
-window.addEventListener('keyup', (e)=>{
-  if (e.code === 'Space' || e.key === ' ') {
-    isSpaceDown = false;
-    if (!isPanning) stageWrapper.classList.remove('space-pan-ready');
-  }
-});
+//window.addEventListener('keydown', (e)=>{
+//  if ((e.code === 'Space' || e.key === ' ') && !inEditable(e.target)) {
+//    e.preventDefault(); // 避免空白鍵捲動頁面/觸發按鈕 click
+//    isSpaceDown = true;
+//    stageWrapper.classList.add('space-pan-ready'); // 換成「🖐 可拖動」游標
+//  }
+//});
+//
+//window.addEventListener('keyup', (e)=>{
+//  if (e.code === 'Space' || e.key === ' ') {
+//    isSpaceDown = false;
+//    if (!isPanning) stageWrapper.classList.remove('space-pan-ready');
+//  }
+//});
 
 // 只在畫布容器內支援拖曳
 stageWrapper.addEventListener('mousedown', (e)=>{
-  if (!isSpaceDown) return;
+   // ✨ 修改：檢查是否為滑鼠中鍵 (e.button === 1)
+  if (e.button !== 1) return;
   e.preventDefault();
   isPanning = true;
-  stageWrapper.classList.add('space-pan-active');
+  stageWrapper.classList.add('space-pan-active'); // 改成用 class 控制游標樣式
   panStart = { x: e.clientX, y: e.clientY };
 });
 
