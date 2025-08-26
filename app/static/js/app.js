@@ -52,6 +52,12 @@ const chipImage = document.getElementById("chipImage");
 
 const statusEl = document.getElementById("status");
 const errorEl = document.getElementById("error");
+const invalidTopEl     = document.getElementById("invalidTop"); // ★ 新增：頂部膠囊
+const invalidCountEl   = document.getElementById("invalidCount");   // ★ 新增
+const invalidPinsTopEl = document.getElementById("invalidPinsTop"); // ★ 新增
+const invalidToggleEl  = document.getElementById("invalidToggle");  // ★ 新增
+const invalidCapsuleEl = document.getElementById("invalidCapsule"); // ★ 新增：膠囊容器
+
 const invalidEl = document.getElementById("invalidPins");
 const projectCodeEl = document.getElementById("projectCode");
 const padwindowEl   = document.getElementById("padwindow");   // ★ 新增
@@ -100,6 +106,37 @@ function nowTime(){
   return `${dt.getFullYear()}/${pad(dt.getMonth()+1)}/${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 document.getElementById("nowtime").textContent = nowTime();
+
+function setInvalidPins(list){
+  INVALID_PINS = Array.isArray(list) ? list : [];
+
+  // 頂部「無法連線 PIN」紅色膠囊
+  if (invalidCapsuleEl){
+    if (INVALID_PINS.length){
+      invalidCapsuleEl.hidden = false;
+      invalidCapsuleEl.classList.remove('collapsed');
+      invalidCapsuleEl.setAttribute('aria-expanded','true');
+
+      if (invalidTopEl)      invalidTopEl.textContent = "無法連線 PIN：";
+      if (invalidCountEl)    invalidCountEl.textContent = String(INVALID_PINS.length);
+      if (invalidPinsTopEl)  invalidPinsTopEl.textContent = INVALID_PINS.join("\n");
+      if (invalidToggleEl)   invalidToggleEl.textContent = "▲"; // 展開中 → 顯示「可收合」
+    } else {
+      // 沒有無法連線資料 → 完全隱藏
+      invalidCapsuleEl.hidden = true;
+      invalidCapsuleEl.classList.remove('collapsed');
+      invalidCapsuleEl.setAttribute('aria-expanded','true');
+
+      if (invalidPinsTopEl) invalidPinsTopEl.textContent = "";
+      if (invalidCountEl)   invalidCountEl.textContent = "0";
+    }
+  }
+
+  // 右側 debug（仍保留，預設 hidden）
+  if (invalidEl){
+    invalidEl.textContent = INVALID_PINS.join("\n");
+  }
+}
 
 function normLabel(s){
   return String(s || "")
@@ -270,12 +307,12 @@ function clearImageAndState(){
   MAX_POINT = null;
   VALID_PINS = [];
   INVALID_PINS = [];
-  invalidEl.textContent = "";
+  setInvalidPins([]);              // 無法連線 PIN 資訊
   // chip 尺寸欄位與圖片尺寸歸零（保險）
   // 清空 Project Code（一起清掉舊專案代碼顯示）
-  projectCodeEl.textContent = "";
-  padwindowEl.textContent   = "";   // ★ 新增
-  cupEl.textContent         = "";   // ★ 新增
+  projectCodeEl.textContent = "";  // projectCode 資訊
+  padwindowEl.textContent   = "";  // padwindow 資訊
+  cupEl.textContent         = "";  // cup 資訊
   hideDataControls();
   hideLoadBtn(); // 註解：清畫面時一併把「載入資料」按鈕隱藏，避免殘留
 }
@@ -452,7 +489,7 @@ function processPinDataToInputs(){
   VALID_PINS = trulyValid;
 
   applyInputColors();
-  invalidEl.textContent = INVALID_PINS.join("\n");
+  setInvalidPins(INVALID_PINS);
 
   // 額外輸出方便 debug
   console.log("真正有效的 pins:", VALID_PINS.map(p=>p.pin_no));
@@ -688,7 +725,7 @@ async function querySheetInfo(){
     centerChipImageInInnerFrame();
     clearOverlay(); MIN_POINT = null; MAX_POINT = null;
     VALID_PINS = []; INVALID_PINS = [];
-    invalidEl.textContent = "";
+    setInvalidPins([]);
     setStatus("已載入：最大張圖片與 chip size；可直接按「2. 載入資料」");
   }
 }
@@ -969,6 +1006,19 @@ stageWrapper.addEventListener('wheel', (e) => {
 
 });
 
+invalidToggleEl?.addEventListener("click", () => {
+  if (!invalidCapsuleEl) return;
+  const expanded = invalidCapsuleEl.getAttribute('aria-expanded') === 'true';
+  if (expanded){
+    invalidCapsuleEl.classList.add('collapsed');
+    invalidCapsuleEl.setAttribute('aria-expanded','false');
+    invalidToggleEl.textContent = "▼"; // 收合後顯示「可展開」
+  }else{
+    invalidCapsuleEl.classList.remove('collapsed');
+    invalidCapsuleEl.setAttribute('aria-expanded','true');
+    invalidToggleEl.textContent = "▲"; // 展開後顯示「可收合」
+  }
+});
 
 
 

@@ -207,7 +207,7 @@ border-radius:4px;
   height: 34px;              /* 統一高度 */
   padding: 0 14px;
   border-radius: 999px;      /* 膠囊外觀 */
-  border: 1px solid #ddd;
+  border: 2px solid #ddd;
   background: rgba(255,255,255,.96);
   line-height: 1;
   font-size: 12px;
@@ -217,6 +217,112 @@ border-radius:4px;
   text-overflow: ellipsis;
   box-shadow: 0 1px 2px rgba(0,0,0,.06);
 }
+
+/* 狀態配色（新增 warn，用於無法連線 PIN 提示） */
+.status-bar .status.warn{
+  border-color: #ffdf91;
+  background: rgba(255,249,230,.96);
+  color: #7a4d00;
+}
+
+
+
+/* 無法連線 PIN 膠囊：預設展開，可收合 */
+.invalid-capsule{
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  max-width: 60vw;
+}
+.invalid-capsule .capsule-row{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.invalid-capsule .toggle{
+  margin-left: auto;          /* 貼齊最右邊 */
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.invalid-capsule .details{
+  white-space: pre-wrap;
+  max-height: 160px;
+  overflow: auto;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: #fff;
+}
+.invalid-capsule.collapsed .details{ display: none; }
+
+.invalid-list pre{
+  background:#ffecec;
+  border-color:#ff8a80;
+}
+
+/* === 新紅色樣式（柔和但醒目） === */
+.status-bar .status.danger{
+  /* 取代原本的實心大紅底 */
+  border-color: #ff8a80;
+  border: 2px solid #ff9aa7;
+  background: linear-gradient(180deg, #fff1f3 0%, #ffe4e7 100%);
+  color: #7b1620;
+  box-shadow: 0 2px 6px rgba(255,0,48,.15);
+}
+
+/* ▲ 展開時：膠囊浮在畫面頂部，可超出原本狀態列高度 */
+#invalidCapsule[aria-expanded="true"]{
+  position: fixed;             /* 直接貼在視窗頂端 */
+  padding-top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;               /* 蓋在頁面上方 */
+  width: clamp(320px, 60vw, 900px);
+
+  /* 打破「一行膠囊」的限制 */
+  height: auto;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+
+  /* 舒服一點的卡片效果 */
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.12);
+}
+
+/* 展開時的內容區：給比較大的可視高度、可捲動 */
+#invalidCapsule[aria-expanded="true"] .details{
+  max-height: 60vh;            /* 依視窗高度自適應 */
+  overflow: auto;
+  background: #fff;            /* 內容改白底 */
+  border: 2px dashed #ff9aa7;  /* 與外框同色的虛線 */
+  color: #7b1620;
+}
+
+/* 收合狀態維持單列高度不變（使用原本 .status 的 34px 規格） */
+.invalid-capsule.collapsed .details{ display:none; }
+
+/* 細節：標題列左側做個小紅色指示條，辨識更清楚（可移除） */
+.invalid-capsule .capsule-row{
+  position: relative;
+  padding-left: 8px;
+}
+.invalid-capsule .capsule-row::before{
+  content:"";
+  position:absolute;
+  left:0; top:50%; transform:translateY(-50%);
+  width:4px; height:18px;
+  border-radius: 2px;
+  background: linear-gradient(180deg,#ff5a6a,#ff3d57);
+}
+
 
 /* 狀態配色（可自行調整） */
 .status-bar .status.normal{

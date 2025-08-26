@@ -23,6 +23,20 @@
 		等待選擇檔案...
 	  </div>
 	  <div id="error" class="status error" role="alert" aria-live="assertive"></div>
+	  <!-- 無法連線 PIN 的頂部紅色膠囊（預設隱藏；有資料才顯示） -->
+	  <div id="invalidCapsule"
+	  	   class="status danger invalid-capsule"
+	  	   role="region"
+	  	   aria-live="polite"
+	  	   aria-expanded="true"
+	  	   hidden>
+	      <div class="capsule-row">
+	  	  <span id="invalidTop" class="title">無法連線 PIN：<b id="invalidCount">0</b> 筆</span>
+	  	  <button id="invalidToggle" class="toggle" type="button" aria-label="收合">▲</button>
+	      </div>
+	      <pre id="invalidPinsTop" class="details"></pre>
+	  </div>
+
 	</div>
 	
     <main>
@@ -173,7 +187,7 @@
 		  <button id="btnCopy">📋 複製截圖</button>
         </div>
 
-        <div class="invalid-list">
+        <div class="invalid-list" hidden>
           <div class="section-title">無法連線的 PIN</div>
           <pre id="invalidPins"></pre>
         </div>
