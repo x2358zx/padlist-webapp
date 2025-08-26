@@ -462,3 +462,15 @@ border-radius:4px;
 #stage.space-pan-active {
   user-select: none;
 }
+
+/* === Corner-conflict line highlight === */
+.overlay line.conflict {
+  stroke: #ff3b30;      /* 醒目紅 */
+  stroke-width: 3;      /* 比一般線更粗 */
+  animation: cornerPulse 0.9s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 2px rgba(255,59,48,0.6));
+}
+@keyframes cornerPulse {
+  from { opacity: 1; }
+  to   { opacity: 0.45; }
+}

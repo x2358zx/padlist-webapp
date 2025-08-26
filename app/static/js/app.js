@@ -526,6 +526,97 @@ function innerAnchorOfBox(boxEl) {
   return { x: toStageX(lb.left + lb.width/2), y: toStageY(lb.top + lb.height/2) };
 }
 
+// === Corner exclusive rule (一個轉角只能打一條線) ===
+// 依目前會畫線的 LABEL 檢查：D&E、F&G、A&P、K&J
+function computeCornerConflictsFromValid(){
+  const have = new Set(VALID_PINS.map(p => String(p.pin_no).trim().toUpperCase()));
+  const corners = [
+    {corner:"左下", labels:["D","E"]},
+    {corner:"右下", labels:["F","G"]},
+    {corner:"左上", labels:["A","P"]},
+    {corner:"右上", labels:["K","J"]},
+  ];
+  return corners.filter(c => c.labels.every(lbl => have.has(lbl)));
+}
+
+// === 線段交叉檢測（有交叉就套用同樣的 .conflict 高亮） ===
+function getOverlayLines(){
+  const ov = document.getElementById("overlay");
+  return Array.from(ov.querySelectorAll("line")).map(el => ({
+    x1: +el.getAttribute("x1"),
+    y1: +el.getAttribute("y1"),
+    x2: +el.getAttribute("x2"),
+    y2: +el.getAttribute("y2"),
+    el,
+    tag: el.dataset.tag || ""
+  }));
+}
+
+const EPS = 0.0001;
+const almostEqual = (a,b)=> Math.abs(a-b) <= EPS;
+const ptEq = (a,b)=> almostEqual(a.x,b.x) && almostEqual(a.y,b.y);
+
+function orient(ax,ay,bx,by,cx,cy){
+  return (bx-ax)*(cy-ay) - (by-ay)*(cx-ax);
+}
+function onSeg(ax,ay,bx,by,cx,cy){
+  return Math.min(ax,bx)-EPS<=cx && cx<=Math.max(ax,bx)+EPS &&
+         Math.min(ay,by)-EPS<=cy && cy<=Math.max(ay,by)+EPS &&
+         Math.abs(orient(ax,ay,bx,by,cx,cy))<=EPS;
+}
+function segIntersect(A,B){
+  const p1={x:A.x1,y:A.y1}, p2={x:A.x2,y:A.y2}, p3={x:B.x1,y:B.y1}, p4={x:B.x2,y:B.y2};
+  // 共用端點不算交叉（避免在同一 pin/同一盒子接點被判定）
+  if(ptEq(p1,p3)||ptEq(p1,p4)||ptEq(p2,p3)||ptEq(p2,p4)) return false;
+
+  const o1 = orient(A.x1,A.y1,A.x2,A.y2, B.x1,B.y1);
+  const o2 = orient(A.x1,A.y1,A.x2,A.y2, B.x2,B.y2);
+  const o3 = orient(B.x1,B.y1,B.x2,B.y2, A.x1,A.y1);
+  const o4 = orient(B.x1,B.y1,B.x2,B.y2, A.x2,A.y2);
+
+  // 一般相交
+  if ((o1>EPS && o2<-EPS || o1<-EPS && o2>EPS) &&
+      (o3>EPS && o4<-EPS || o3<-EPS && o4>EPS)) return true;
+
+  // 共線重疊也算交叉
+  if (Math.abs(o1)<=EPS && (onSeg(A.x1,A.y1,A.x2,A.y2, B.x1,B.y1) || onSeg(A.x1,A.y1,A.x2,A.y2, B.x2,B.y2))) return true;
+  if (Math.abs(o3)<=EPS && (onSeg(B.x1,B.y1,B.x2,B.y2, A.x1,A.y1) || onSeg(B.x1,B.y1,B.x2,B.y2, A.x2,A.y2))) return true;
+
+  return false;
+}
+
+function checkLineIntersections(){
+  const lines = getOverlayLines();
+  // 不要清 .conflict，避免蓋掉「轉角互斥」；只把需要的線再加上 .conflict
+  for(let i=0;i<lines.length;i++){
+    for(let j=i+1;j<lines.length;j++){
+      if (segIntersect(lines[i], lines[j])){
+        lines[i].el.classList.add('conflict');
+        lines[j].el.classList.add('conflict');
+      }
+    }
+  }
+}
+
+
+// 將衝突的兩條線加上 .conflict（以 data-tag 選取）
+// 每次先清掉舊的，再套新的
+function highlightCornerLines(conflicts){
+  const ov = document.getElementById("overlay");
+  if(!ov) return;
+  ov.querySelectorAll("line.conflict").forEach(el => el.classList.remove("conflict"));
+  (conflicts||[]).forEach(c => (c.labels||[]).forEach(lbl => {
+    const el = ov.querySelector(`[data-tag="LINE_${lbl}"]`);
+    if (el) el.classList.add("conflict");
+  }));
+}
+
+// 每次重繪完成就檢查一次
+function checkCornerExclusive(){
+  const conflicts = computeCornerConflictsFromValid();
+  highlightCornerLines(conflicts);
+}
+
 
 // ====== Draw pins and lines ======
 function drawPinsAndLines(){
@@ -554,6 +645,9 @@ function drawPinsAndLines(){
     }
 
   });
+  
+  checkCornerExclusive();     // 先做轉角互斥（會清掉舊 .conflict 再套角落高亮）
+  checkLineIntersections();   // 再做「線交叉」→ 把交叉線也加上 .conflict 高亮
 }
 
 // === 用 html2canvas 把 #stage 直接截圖（所見即所得） ===
