@@ -710,7 +710,7 @@ async function querySheetInfo(){
   // ★ 新增：把 PadWindow / CUP 寫進膠囊
   if (data.extras) {
     padwindowEl.textContent = data.extras.PadWindow || "";
-    cupEl.textContent       = data.extras.CUP       || "";
+    cupEl.textContent       = data.extras.CUP       || "[no msg]";
   } else {
     padwindowEl.textContent = "";
     cupEl.textContent       = "";
