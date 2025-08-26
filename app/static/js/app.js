@@ -71,6 +71,10 @@ const sheetSelector = document.getElementById("sheetSelector");
 const zoomRange = document.getElementById("zoomRange");
 const zoomVal = document.getElementById("zoomVal");
 
+const viewToggleBtn = document.getElementById("btnViewToggle"); // ★ 新增：放大/1:1 視圖切換
+let BIG_VIEW_MODE = false;                                     // ★ false=1:1/既有比例，true=放大到黃色區0.9 (BIG_VIEW_RATIO)
+const BIG_VIEW_RATIO = 0.9;                                    // ★ 放大到黃色區的佔比
+
 const dataControls = document.getElementById("dataControls");
 const hideDataControls   = () => dataControls?.setAttribute("hidden", "");
 const revealDataControls = () => dataControls?.removeAttribute("hidden");
@@ -617,6 +621,63 @@ function checkCornerExclusive(){
   highlightCornerLines(conflicts);
 }
 
+// === 視圖切換：1:1 / 放大到黃色區 0.9 倍 ===
+// 取 chip 基本顯示尺寸（從 chip size 轉 px）
+function baseChipPixelSize(){
+  const w_um = Number(chipWidthEl.value)  || 0;
+  const h_um = Number(chipHeightEl.value) || 0;
+  if (!w_um || !h_um) return null;
+  return sizeFromChipUm(w_um, h_um); // {w,h}
+}
+
+// 將圖片置中到指定矩形（stage 座標）
+function centerImageToRect(imgW, imgH, rect){
+  chipImage.style.left = `${rect.left + (rect.right - rect.left - imgW)/2}px`;
+  chipImage.style.top  = `${rect.top  + (rect.bottom - rect.top - imgH)/2}px`;
+}
+
+// 依目前模式套用視圖
+function applyViewMode(){
+  if (!chipImage.classList.contains('loaded')) return; // 沒圖不處理
+  const base = baseChipPixelSize();
+  if (!base) return;
+  
+  if (!BIG_VIEW_MODE){
+    // 1:1 / 既有比例（用 chip size 像素值）→ 置中到四側 pin 盒的內框
+    chipImage.style.width  = base.w + "px";
+    chipImage.style.height = base.h + "px";
+    centerChipImageInInnerFrame();
+  } else {
+    // 放大視圖：塞進黃色區（#epadBackground）0.9 倍，長/寬先到就停
+    const epad = document.getElementById("epadBackground");
+    const rect = epad ? getStageRect(epad) : null;
+    if (!rect){
+      // 找不到黃色區就退回 1:1（避免壞狀態）
+      chipImage.style.width  = base.w + "px";
+      chipImage.style.height = base.h + "px";
+      centerChipImageInInnerFrame();
+    } else {
+      const epadW = rect.right - rect.left;
+      const epadH = rect.bottom - rect.top;
+      const s = BIG_VIEW_RATIO * Math.min(epadW / base.w, epadH / base.h); // 等比例放大
+      const w = base.w * s, h = base.h * s;
+      chipImage.style.width  = w + "px";
+      chipImage.style.height = h + "px";
+      centerImageToRect(w, h, rect); // 置中到黃色區
+    }
+  }
+  // 依圖片邊界重設 MIN/MAX → 重畫（避免比例改變造成定位不符）
+  if (typeof setMinMaxToImage === 'function') setMinMaxToImage();
+  if (typeof drawPinsAndLines  === 'function') drawPinsAndLines();
+}
+
+// ★ 切換按鈕監聽：文字與模式互切
+viewToggleBtn?.addEventListener('click', ()=>{
+  BIG_VIEW_MODE = !BIG_VIEW_MODE;
+  viewToggleBtn.textContent = BIG_VIEW_MODE ? "1:1視圖" : "放大視圖";
+  applyViewMode();
+});
+
 
 // ====== Draw pins and lines ======
 function drawPinsAndLines(){
@@ -817,6 +878,8 @@ async function querySheetInfo(){
   // 置中僅在有圖時才做，避免做多餘動作
   if (hasChipSize && data.image_url) {
     centerChipImageInInnerFrame();
+	// ★ 視圖模式套用（若使用者已切到放大視圖會即時生效）
+    if (typeof applyViewMode === "function") applyViewMode();
     clearOverlay(); MIN_POINT = null; MAX_POINT = null;
     VALID_PINS = []; INVALID_PINS = [];
     setInvalidPins([]);

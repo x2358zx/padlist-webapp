@@ -96,8 +96,10 @@
 		  -->
 
           <div class="row zoom-row">
-            <label>縮放(ctrl+滾輪)：</label>
-            <span id="zoomVal">100%</span>
+		    <ul>
+              <li>縮放(ctrl+滾輪)：<span id="zoomVal">100%</span></li>
+			  <li>滾輪中鍵按著可以抓住並且移動</li>
+			</ul>
           </div>
         </div>
 		
@@ -105,7 +107,7 @@
           <legend class="capsule-legend">邊界內縮（MIN/MAX OFFSET）</legend>
         
           <label class="row">
-            <span>四邊連動</span>
+            <span>四邊連動 (shift+滾輪可以控制)</span>
             <input id="offsetLink" type="checkbox" checked>
           </label>
         
@@ -185,6 +187,7 @@
         <div class="actions">
           <button id="btnDownload">下載 PNG 截圖</button>
 		  <button id="btnCopy">📋 複製截圖</button>
+		  <button id="btnViewToggle" title="切換放大/1:1 視圖">放大視圖</button>
         </div>
 
         <div class="invalid-list" hidden>
