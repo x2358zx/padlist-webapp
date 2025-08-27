@@ -779,6 +779,15 @@ async function copyStageToClipboard() {
   }
 }
 
+// 允許重新選擇同名檔案也會觸發 change（關鍵修正）
+// 放在 excelFile 的 change 綁定「前面」
+const excelInput = document.getElementById('excelFile');
+excelInput.addEventListener('click', () => {
+  // 清空目前選擇，確保相同檔名再次選取也會觸發 change
+  excelInput.value = '';
+});
+
+
 // ====== Event wiring ======
 document.getElementById("excelFile").addEventListener("change", async (e)=>{
   const f = e.target.files[0];
@@ -867,7 +876,7 @@ async function querySheetInfo(){
       chipImage.classList.remove('loaded');  // 成功後由 load 事件顯示 & 開啟按鈕
       chipImage.removeAttribute('src');      // 先取消舊請求，降低競態
       chipImage.dataset.req = String(token); // 標記此圖對應的請求序號
-      chipImage.src = data.image_url;        // 交給瀏覽器載入
+      chipImage.src = data.image_url + `?v=${Date.now()}`; // 加上時間戳避免快取
       } else {
         // 找不到圖 → 視為載入錯誤，才加紅框
         clearImageAndState();
