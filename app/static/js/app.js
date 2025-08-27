@@ -796,6 +796,8 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
   hideLoadBtn();           // 換新檔 → 先把載入資料按鈕藏起來
   // 先清空圖片，再清空 chip 欄位（避免先清欄位造成瞬間閃爍）
   clearImageAndState();
+  if (window.resetOffsets) window.resetOffsets(); // ★ 換新檔案 → OFFSET 歸零（不緩存）
+  if (window.resetPinStyle) window.resetPinStyle(); // ★ 換新檔案 → Pin 樣式回預設（倍率 1.5×、#BEBEBE）
   setStatus("上傳中...");
   hideDataControls();
   const fd = new FormData();
@@ -834,7 +836,8 @@ sheetSelector.addEventListener("change", querySheetInfo);
 async function querySheetInfo(){
   hideDataControls();
   hideLoadBtn();           // 註解：切表當下先把載入按鈕藏起來
-  
+  if (window.resetOffsets) window.resetOffsets(); // ★ 換新檔案 → OFFSET 歸零（不緩存）
+  if (window.resetPinStyle) window.resetPinStyle(); // ★ 切換工作表 → Pin 樣式回預設
   if(!SESSION_ID || !sheetSelector.value) return;
   setError("");
   
@@ -1054,20 +1057,52 @@ document.addEventListener('DOMContentLoaded', () => {
   const scaleSel = document.getElementById('pinStyleScale');
   const colorRadios = document.querySelectorAll('input[name="pinStyleColor"]');
 
-  function loadOffset() {
-    try {
-      const s = localStorage.getItem('minmax_offset');
-      if (!s) return;
-      const o = JSON.parse(s);
-      ['left','right','top','bottom'].forEach(k=>{
-        if (typeof o[k] === 'number') MINMAX_OFFSET[k] = o[k];
-      });
-    } catch(e){}
+  // ★ 讓外部（切檔/切表）也能把 Pin 樣式回預設並同步 UI
+window.resetPinStyle = function () {
+  // 預設：1.5× 與 #BEBEBE（與你的常數初始值一致）
+  PIN_STYLE_SCALE = 1.5;
+  PIN_STYLE_COLOR = "#BEBEBE";
+
+  // （可選）清掉過去可能殘留的快取，避免混淆
+  try { localStorage.removeItem('pin_style'); } catch(e){}
+
+  // 同步 UI：倍率下拉
+  if (scaleSel) {
+    const val = "1.5";
+    if ([...scaleSel.options].some(o => o.value === val)) scaleSel.value = val;
+  }
+  // 同步 UI：顏色單選
+  if (colorRadios && colorRadios.length) {
+    colorRadios.forEach(r => { r.checked = (r.value === PIN_STYLE_COLOR); });
   }
 
-  function saveOffset() {
-    localStorage.setItem('minmax_offset', JSON.stringify(MINMAX_OFFSET));
+  // 立即重畫（不用觸發 change 事件）
+  if (typeof drawPinsAndLines === 'function') drawPinsAndLines();
+};
+
+
+  //function loadOffset() {
+  //  try {
+  //    const s = localStorage.getItem('minmax_offset');
+  //    if (!s) return;
+  //    const o = JSON.parse(s);
+  //    ['left','right','top','bottom'].forEach(k=>{
+  //      if (typeof o[k] === 'number') MINMAX_OFFSET[k] = o[k];
+  //    });
+  //  } catch(e){}
+  //}
+  
+  // 不再從 localStorage 載入，初始化就歸零
+  function loadOffset() {
+    // ★ 取消緩存：每次進頁面都回 0
+    MINMAX_OFFSET = { left:0, right:0, top:0, bottom:0 };
+    // ★ 一次性清掉舊版留下的快取鍵（避免其他地方誤讀到）
+    try { localStorage.removeItem('minmax_offset'); } catch (e) {}
   }
+
+  //function saveOffset() {
+  //  localStorage.setItem('minmax_offset', JSON.stringify(MINMAX_OFFSET));
+  //}
 
   function syncUI() {
     const eq = (MINMAX_OFFSET.left === MINMAX_OFFSET.right) &&
@@ -1095,7 +1130,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function applyAndRedraw() {
-    saveOffset();
+    //saveOffset();//取消緩存
     if (typeof setMinMaxToImage === 'function') setMinMaxToImage();
     if (typeof drawPinsAndLines  === 'function') drawPinsAndLines();
   }
@@ -1197,6 +1232,17 @@ document.addEventListener('DOMContentLoaded', () => {
   syncUI();
   // 首次載入就套用一次（若你要等圖片載好再套，可以把這行移到 onload 後）
   applyAndRedraw();
+  
+  // ★ 讓外部（切檔/切表）也能重置 OFFSET 並同步 UI
+window.resetOffsets = function () {
+  MINMAX_OFFSET = { left:0, right:0, top:0, bottom:0 };
+  // 同步 UI 顯示狀態（四邊連動/拉桿值/顯示數字）
+  if (typeof syncUI === 'function') syncUI();
+  // 重新套用到計算與繪圖
+  if (typeof setMinMaxToImage === 'function') setMinMaxToImage();
+  if (typeof drawPinsAndLines  === 'function') drawPinsAndLines();
+};
+
   
   // === Shift + 滾輪：調整「邊界內縮」 ===
 // 規則：
