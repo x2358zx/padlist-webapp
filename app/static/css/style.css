@@ -474,3 +474,31 @@ border-radius:4px;
   from { opacity: 1; }
   to   { opacity: 0.45; }
 }
+
+/* --- Pin 樣式：單選膠囊＋顏色圓點 --- */
+.radio-chip-palette {
+  display:flex;
+  gap:.5rem;
+  flex-wrap:wrap;
+}
+
+.radio-chip {
+  display:inline-flex;
+  align-items:center;
+  gap:.35rem;
+  padding:4px 8px;
+  border:1px solid #ddd;
+  border-radius:999px;
+  background:#fff;
+  cursor:pointer;
+  user-select:none;
+}
+.radio-chip input[type="radio"] { accent-color:#0d6efd; }
+
+.radio-chip .swatch {
+  width:14px; height:14px;
+  border-radius:999px;
+  border:1px solid #bbb;
+  background: var(--c, #ccc);
+  display:inline-block;
+}

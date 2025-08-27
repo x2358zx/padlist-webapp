@@ -71,8 +71,6 @@
           </div>
         </div>
 
-
-
         <!-- ★ 改成自動偵測：這段預設隱藏，如需除錯再拿掉 hidden -->
         <div class="section" hidden>
           <div class="section-title">欄位設定（已改為自動偵測）</div>
@@ -102,6 +100,40 @@
 			</ul>
           </div>
         </div>
+		
+		<fieldset class="group capsule-block">
+          <legend class="capsule-legend">點線樣式（Pins）</legend>
+        
+          <!-- 點線大小倍率 -->
+          <label class="row">
+            <span>點線大小</span>
+            <select id="pinStyleScale">
+              <option value="1.5" selected>1.5×（預設）</option>
+              <option value="2.5">2.5×</option>
+              <option value="4">4×</option>
+            </select>
+          </label>
+        
+          <!-- 點線顏色（三選一） -->
+          <div class="row">
+            <span>顏色</span>
+            <div class="radio-chip-palette" id="pinStyleColorGroup">
+              <label class="radio-chip">
+                <input type="radio" name="pinStyleColor" value="#BEBEBE" checked>
+                <span class="swatch" style="--c:#BEBEBE"></span>灰（預設）
+              </label>
+              <label class="radio-chip">
+                <input type="radio" name="pinStyleColor" value="#00EC00">
+                <span class="swatch" style="--c:#00EC00"></span>綠
+              </label>
+              <label class="radio-chip">
+                <input type="radio" name="pinStyleColor" value="#00CACA">
+                <span class="swatch" style="--c:#00CACA"></span>藍綠
+              </label>
+            </div>
+          </div>
+        </fieldset>
+
 		
 	    <fieldset class="group capsule-block">
           <legend class="capsule-legend">邊界內縮（MIN/MAX OFFSET）</legend>

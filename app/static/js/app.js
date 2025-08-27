@@ -4,9 +4,22 @@ const rightLabels = ["J","I","79","77","75","74","73","72","69","68","65","63","
 const topLabels   = ["P","O","N","96","95","94","93","92","91","87","85","83","81","M","L","K"];
 const bottomLabels= ["E","31","32","33","35","36","37","40","41","44","45","46","47","49","50","F"];
 
-// === Drawing size constants ===
-const PIN_DOT_RADIUS = 1.5;   // 紅點跟藍點的大小，原本是 4，改小點
-const PIN_LINE_WIDTH = 1.5; // 連線大小，原本是 2
+// === Drawing size (可調) ===
+// MIN/MAX 藍點：固定半徑（維持可讀性）
+const MINMAX_DOT_RADIUS = 1.5;
+
+// Pins 的點線：以「基準 * 倍率」計算（倍率由 UI 選）
+const BASE_PIN_DOT_RADIUS = 1.0;  // 基準半徑
+const BASE_PIN_LINE_WIDTH = 1.0;  // 基準線寬
+
+// 目前樣式狀態（預設：1.5×、灰 #BEBEBE）
+let PIN_STYLE_SCALE = 1.5;
+let PIN_STYLE_COLOR = "#BEBEBE";
+
+// 取當前點/線實際數值
+function pinDotRadius(){ return BASE_PIN_DOT_RADIUS * PIN_STYLE_SCALE; }
+function pinLineWidth(){ return BASE_PIN_LINE_WIDTH * PIN_STYLE_SCALE; }
+
 
 // === Label layout knobs ===
 const STEP_V = 33;     // 垂直間距
@@ -683,8 +696,9 @@ viewToggleBtn?.addEventListener('click', ()=>{
 function drawPinsAndLines(){
   clearOverlay();
   // draw MIN/MAX (藍點)
-  if(MIN_POINT){ drawCircle(MIN_POINT.x, MIN_POINT.y, PIN_DOT_RADIUS, "#00f"); drawText(MIN_POINT.x+5, MIN_POINT.y-5, "MIN","#00f"); }
-  if(MAX_POINT){ drawCircle(MAX_POINT.x, MAX_POINT.y, PIN_DOT_RADIUS, "#00f"); drawText(MAX_POINT.x-20, MAX_POINT.y+10, "MAX","#00f"); }
+  // ★ MIN/MAX 固定藍色與固定半徑（MINMAX_DOT_RADIUS）
+  if(MIN_POINT){ drawCircle(MIN_POINT.x, MIN_POINT.y, pinDotRadius(), "#00f"); drawText(MIN_POINT.x+5, MIN_POINT.y-5, "MIN","#00f"); }
+  if(MAX_POINT){ drawCircle(MAX_POINT.x, MAX_POINT.y, pinDotRadius(), "#00f"); drawText(MAX_POINT.x-20, MAX_POINT.y+10, "MAX","#00f"); }
 
   const chipW = Number(chipWidthEl.value), chipH = Number(chipHeightEl.value);
   if(!chipW || !chipH || !MIN_POINT || !MAX_POINT) return;
@@ -692,13 +706,15 @@ function drawPinsAndLines(){
   VALID_PINS.forEach(p => {
     const pt = chipToStage(p.x, p.y, chipW, chipH);
     if(!pt) return;
-    drawCircle(pt.x, pt.y, PIN_DOT_RADIUS, "#f00", `PIN_${p.pin_no}`);
+    // ★ Pins 用可調半徑與顏色
+    drawCircle(pt.x, pt.y, pinDotRadius(), PIN_STYLE_COLOR, `PIN_${p.pin_no}`);
 
     // 以「pin 盒子 .pin-box」為對象，連到內側邊緣
     const boxEl = inputsByLabel.get(p.pin_no) || inputsByLabelNorm.get(normLabel(p.pin_no));
     if (boxEl) {
       const anchor = innerAnchorOfBox(boxEl); // 內側錨點
-      drawLine(pt.x, pt.y, anchor.x, anchor.y, "#f00", PIN_LINE_WIDTH, `LINE_${p.pin_no}`);
+      // ★ Pins 用可調線寬與顏色
+      drawLine(pt.x, pt.y, anchor.x, anchor.y, PIN_STYLE_COLOR, pinLineWidth(), `LINE_${p.pin_no}`);
     
       // （可選）讓對應的標籤加粗
       const labelDiv = labelDivsByLabel.get(p.pin_no);
@@ -1024,6 +1040,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const vBottom= document.getElementById('offsetBottomValue');
   const vLeft  = document.getElementById('offsetLeftValue');
   const grid   = document.getElementById('offsetGrid');
+  
+  // === Pin Style UI 綁定 ===
+  const scaleSel = document.getElementById('pinStyleScale');
+  const colorRadios = document.querySelectorAll('input[name="pinStyleColor"]');
 
   function loadOffset() {
     try {
@@ -1115,6 +1135,52 @@ document.addEventListener('DOMContentLoaded', () => {
     MINMAX_OFFSET = { left:0, right:0, top:0, bottom:0 };
     syncUI();
     applyAndRedraw();
+  });
+
+  // 從 localStorage 載入偏好
+  //try {
+  //  const s = localStorage.getItem('pin_style');
+  //  if (s) {
+  //    const st = JSON.parse(s);
+  //    if (st && typeof st.scale === 'number') PIN_STYLE_SCALE = st.scale;
+  //    if (st && typeof st.color === 'string') PIN_STYLE_COLOR = st.color;
+  //  }
+  //} catch(e){}
+  //
+  //// 套回 UI
+  //if (scaleSel) {
+  //  const val = String(PIN_STYLE_SCALE);
+  //  if ([...scaleSel.options].some(o=>o.value===val)) scaleSel.value = val;
+  //}
+  //if (colorRadios && colorRadios.length) {
+  //  colorRadios.forEach(r => { r.checked = (r.value === PIN_STYLE_COLOR); });
+  //}
+
+  // 事件監聽：改變就即時重畫＋存偏好
+  const saveStyle = () => {
+    try {
+      localStorage.setItem('pin_style', JSON.stringify({
+        scale: PIN_STYLE_SCALE,
+        color: PIN_STYLE_COLOR
+      }));
+    } catch(e){}
+  };
+
+  scaleSel?.addEventListener('change', () => {
+    const v = parseFloat(scaleSel.value);
+    PIN_STYLE_SCALE = isFinite(v) ? v : 1.5;
+    drawPinsAndLines();  // 即時重畫
+    saveStyle();
+  });
+
+  colorRadios?.forEach(r => {
+    r.addEventListener('change', () => {
+      if (r.checked) {
+        PIN_STYLE_COLOR = r.value;
+        drawPinsAndLines();  // 即時重畫
+        saveStyle();
+      }
+    });
   });
 
   // init
