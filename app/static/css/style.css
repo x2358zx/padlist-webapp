@@ -475,30 +475,136 @@ border-radius:4px;
   to   { opacity: 0.45; }
 }
 
-/* --- Pin 樣式：單選膠囊＋顏色圓點 --- */
-.radio-chip-palette {
-  display:flex;
-  gap:.5rem;
-  flex-wrap:wrap;
+/* ===== Sunny Accordion (scoped) ===== */
+.accordion{
+  /* 柔和「陽光系」調色盤，可自行微調 */
+  --ink: #2f261a;
+  --ink-muted: #6a5538;
+  --sun-50: #FFF8E1;
+  --sun-100:#FFEDBF;
+  --sun-200:#FFE08A;
+  --accent:#FFB54A;
+  --accent-strong:#FF9F1C;
+  --ring:#FFCF73;
+
+  display: grid;
+  gap: 10px;
 }
 
-.radio-chip {
-  display:inline-flex;
-  align-items:center;
-  gap:.35rem;
-  padding:4px 8px;
-  border:1px solid #ddd;
-  border-radius:999px;
+/* 每格外觀 */
+.accordion .acc-item{
   background:#fff;
-  cursor:pointer;
-  user-select:none;
+  border:1px solid #f3d28a;
+  border-radius:12px;
+  box-shadow:0 1px 2px rgba(0,0,0,.04);
+  overflow: clip; /* 邊角更乾淨 */
 }
-.radio-chip input[type="radio"] { accent-color:#0d6efd; }
 
-.radio-chip .swatch {
-  width:14px; height:14px;
+/* 標題列 */
+.accordion .acc-header{
+  width:100%;
+  text-align:left;
+  border:0;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:8px;
+
+  color:var(--ink);
+  font-weight:700;
+  padding:12px 44px 12px 14px;
+  background:linear-gradient(180deg, var(--sun-100), var(--sun-50));
+
+  position:relative;
+  transition:background .18s ease, box-shadow .18s ease;
+}
+
+/* 左側小太陽點綴 */
+.accordion .acc-header::before{
+  content:"";
+  width:16px; height:16px; border-radius:50%;
+  background: radial-gradient(circle at 30% 30%, #fff 0 30%, var(--accent) 31% 100%);
+  box-shadow: 0 0 0 3px #fff inset, 0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* 右側箭頭 */
+.accordion .acc-header::after{
+  content:"▸";
+  position:absolute; right:14px; top:50%;
+  transform:translateY(-50%) rotate(0deg);
+  font-size:16px; color:var(--ink-muted);
+  transition:transform .18s ease, color .18s ease;
+}
+
+.accordion .acc-header:hover{
+  background:linear-gradient(180deg, var(--sun-200), var(--sun-100));
+}
+.accordion .acc-header:focus-visible{
+  outline:3px solid var(--ring);
+  outline-offset:2px;
+}
+
+/* 展開狀態視覺 */
+.accordion .acc-header[aria-expanded="true"]{
+  background:linear-gradient(180deg, var(--sun-200), var(--sun-100));
+  box-shadow: inset 0 -1px 0 #f3d28a;
+}
+.accordion .acc-header[aria-expanded="true"]::after{
+  transform:translateY(-50%) rotate(90deg);
+  color:var(--accent-strong);
+}
+
+/* 內容區 */
+.accordion .acc-panel{
+  display:block;                /* 預設由 JS 移除/加上 hidden 控制顯示 */
+  background:#fff;
+  padding:0 14px 14px;
+  border-top:1px dashed #f5d79b;
+}
+.accordion .acc-panel[hidden]{  /* 與 JS 的 hidden 屬性相容 */
+  display:none !important;
+}
+/* 若你的 JS 同時切 aria-expanded，也可用下行輔助（可留可不留） */
+/* .accordion .acc-header[aria-expanded="true"] + .acc-panel{ display:block; } */
+
+.accordion .acc-content{
+  margin:12px 0 6px;
+  padding:10px 12px;
+  background:#FFFDF5;           /* 柔和米色底，不會把字淹掉 */
+  border:1px solid #f1e3b8;
+  border-radius:10px;
+  color:var(--ink);
+  line-height:1.6;
+  white-space:pre-wrap;          /* 讓換行更顯示友好 */
+}
+
+/* 主管編輯按鈕排版（如有啟用） */
+.accordion .acc-actions{
+  display:flex; gap:8px;
+}
+.accordion .acc-actions .acc-edit,
+.accordion .acc-actions .acc-save,
+.accordion .acc-actions .acc-cancel{
+  appearance:none;
   border-radius:999px;
-  border:1px solid #bbb;
-  background: var(--c, #ccc);
-  display:inline-block;
+  font-size:12px;
+  padding:6px 12px;
+  cursor:pointer;
+  color:var(--ink);
+  border:1px solid #f3c36b;
+  background:linear-gradient(180deg, #FFE9B6, #FFD88A);
+}
+.accordion .acc-actions .acc-cancel{
+  border-color:#e0b0a8;
+  background:linear-gradient(180deg, #ffe4e1, #ffd3cf);
+}
+.accordion .acc-actions button:hover{ filter:brightness(1.03); }
+.accordion .acc-actions button:active{ transform:translateY(1px); }
+
+/* 指定維持亮色（你說不需要黑暗模式） */
+@media (prefers-color-scheme: dark){
+  .accordion .acc-item,
+  .accordion .acc-header,
+  .accordion .acc-panel,
+  .accordion .acc-content{ color-scheme: light; }
 }

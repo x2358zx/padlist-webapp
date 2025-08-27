@@ -178,18 +178,49 @@
         </fieldset>
 </div>
 
-        <div class="notice">
-          <div class="section-title">注意事項(by Rita)</div>
-          <ul>
-            <li>僅支援 .xlsx，請勿同時於 Excel 中開啟</li>
-            <li>每個工作表僅使用該表<b>第一張圖片</b></li>
-            <li>A1:E6 若沒資料則不會顯示工作表</li>
-            <li>滑桿可縮放畫布（0.5~3.0）</li>
-            <li>MIN 請點圖片左下；MAX 請點右上；錯誤可按重置</li>
-            <li>PinNo 空白、PinName=NC、或無效座標 會列入「無法連線 PIN」</li>
-            <li>VDD/VDP → 粉紅；VSS → 淺綠；空白 → 灰；含 Q → 淺藍</li>
-          </ul>
+        <!-- 取代原本的 notice UL：手風琴（可同時全關，但不可同時全開） -->
+<div class="notice">
+  <div class="section-title">注意事項</div>
+
+  <div class="accordion" id="noticesAcc" role="tablist" aria-multiselectable="false">
+    <!-- 操作注意 -->
+    <div class="acc-item">
+      <button class="acc-header" data-key="operation" aria-expanded="false" type="button">
+        操作注意
+      </button>
+      <div class="acc-panel" hidden>
+        <!-- 用 <pre> 保留換行、避免 contenteditable 產生雜 tag -->
+        <pre id="notice-op" class="acc-content" data-key="operation"></pre>
+
+        <!-- 僅主管可見 -->
+        <div class="acc-actions" hidden data-key="operation">
+          <button class="acc-edit"   type="button">編輯</button>
+          <button class="acc-save"   type="button" hidden>儲存</button>
+          <button class="acc-cancel" type="button" hidden>取消</button>
         </div>
+        <textarea class="acc-editor" hidden></textarea>
+      </div>
+    </div>
+
+    <!-- bonding 注意 -->
+    <div class="acc-item">
+      <button class="acc-header" data-key="bonding" aria-expanded="false" type="button">
+        bonding 注意
+      </button>
+      <div class="acc-panel" hidden>
+        <pre id="notice-bond" class="acc-content" data-key="bonding"></pre>
+
+        <div class="acc-actions" hidden data-key="bonding">
+          <button class="acc-edit"   type="button">編輯</button>
+          <button class="acc-save"   type="button" hidden>儲存</button>
+          <button class="acc-cancel" type="button" hidden>取消</button>
+        </div>
+        <textarea class="acc-editor" hidden></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
 
       </section>
 
