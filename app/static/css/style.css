@@ -608,3 +608,57 @@ border-radius:4px;
   .accordion .acc-panel,
   .accordion .acc-content{ color-scheme: light; }
 }
+
+/* === 按鈕美化樣式 === */
+.actions {
+  display: flex;       /* 使用 Flexbox 排版 */
+  gap: 12px;           /* 按鈕之間的間距 */
+  margin-top: 16px;    /* 與上方元素的距離 */
+}
+
+.actions button {
+  /* 基本樣式 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;      /* 字體稍粗，更清晰 */
+  color: #fff;           /* 文字顏色為白色 */
+  border: none;
+  border-radius: 8px;    /* 圓角 */
+  cursor: pointer;
+  
+  /* 質感與互動效果 */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease-in-out; /* 平滑的過渡動畫 */
+}
+
+/* 滑鼠懸停效果 */
+.actions button:hover {
+  transform: translateY(-2px); /* 向上微移 */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+/* 按下時的效果 */
+.actions button:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* --- 個別按鈕顏色 --- */
+
+/* 下載按鈕 (主色調) */
+#btnDownload {
+  background: linear-gradient(135deg, #007BFF, #0056b3);
+}
+
+/* 複製按鈕 (成功/輔助色) */
+#btnCopy {
+  background: linear-gradient(135deg, #28a745, #1e7e34);
+}
+
+/* 視圖切換按鈕 (中性色) */
+#btnViewToggle {
+  background: linear-gradient(135deg, #6c757d, #5a6268);
+}
