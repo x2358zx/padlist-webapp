@@ -556,10 +556,11 @@ border-radius:4px;
 
 /* 內容區 */
 .accordion .acc-panel{
-  display:block;                /* 預設由 JS 移除/加上 hidden 控制顯示 */
+  display:block;
   background:#fff;
-  padding:0 14px 14px;
+  padding:6px 14px 14px;       /* ↑ 讓按鈕更靠近標題 */
   border-top:1px dashed #f5d79b;
+  overflow:hidden;             /* 保險：避免內容外溢出圓角 */
 }
 .accordion .acc-panel[hidden]{  /* 與 JS 的 hidden 屬性相容 */
   display:none !important;
@@ -661,4 +662,41 @@ border-radius:4px;
 /* 視圖切換按鈕 (中性色) */
 #btnViewToggle {
   background: linear-gradient(135deg, #6c757d, #5a6268);
+}
+
+/* 進入編輯模式時，讓可編輯區塊有明顯提示 */
+.edit-enabled [data-editable].editable {
+  outline: 2px dashed #f9a825;  /* 柔和的陽光黃 */
+  outline-offset: 2px;
+}
+
+/* === 手風琴：編輯器樣式（寬度自適應 + 舒服的外觀） === */
+.accordion .acc-panel{
+  display: grid;
+  align-items: start;
+  gap: 10px;
+}
+
+/* 顯示用 <pre> 已有 acc-content，就不動它 */
+.accordion .acc-editor{
+  display: block;
+  min-height: 140px;           /* 舒服的起始高度 */
+  max-height: 60vh;            /* 最高不超過視窗 60% 高 */
+  resize: vertical;            /* 允許上下拉高 */
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid #f1c27d; /* 和 acc-content 同色系 */
+  background: #FFFCF4;         /* 柔和米白 */
+  line-height: 1.6;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.06);
+  outline: none;
+  font-family: inherit;        /* 和頁面字體一致 */
+  font-size: 14px;
+}
+
+
+/* 有編輯權限時的聚焦態（好看 & 明顯） */
+.edit-enabled .accordion .acc-editor:focus{
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245,158,11,.15);
 }

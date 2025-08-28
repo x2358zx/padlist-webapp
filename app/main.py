@@ -27,6 +27,62 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
+# === 身分/環境設定（以環境變數為主） ===
+TRUST_PROXY = os.getenv("TRUST_PROXY", "1") == "1"
+DEPLOY_ENV = os.getenv("DEPLOY_ENV", "test")
+SUPERVISOR_USERS = [u.strip() for u in os.getenv("SUPERVISOR_USERS", "").split(",") if u.strip()]
+ALLOWED_EDITOR_IPS = [ip.strip() for ip in os.getenv("ALLOWED_EDITOR_IPS", "").split(",") if ip.strip()]
+DEV_ALLOW_LOCAL_EDITOR = os.getenv("DEV_ALLOW_LOCAL_EDITOR", "1") == "1"
+
+def get_client_ip(request: Request) -> str:
+    """
+    從 X-Forwarded-For / X-Real-IP（在 nginx 設定）或 fallback 到 request.client.host 取得來源 IP
+    """
+    if TRUST_PROXY:
+        xff = request.headers.get("x-forwarded-for")
+        if xff:
+            # 取最前面那個（最接近客戶端）
+            return xff.split(",")[0].strip()
+        xri = request.headers.get("x-real-ip")
+        if xri:
+            return xri.strip()
+    # 沒代理或沒標頭時
+    return (request.client.host if request.client else "") or ""
+
+def is_editor(request: Request) -> bool:
+    """
+    伺服端權限判斷（IP / AD 使用者）
+    規則：
+    1) 若有 AD 使用者（X-Remote-User），且在 SUPERVISOR_USERS 清單中 → 通過
+    2) 來源 IP 在 ALLOWED_EDITOR_IPS → 通過
+    3) 本機/開發測試：DEV_ALLOW_LOCAL_EDITOR=1 且 IP 為 127.0.0.1 / ::1 → 通過
+    """
+    ip = get_client_ip(request)
+    user = request.headers.get("X-Remote-User") or request.headers.get("Remote-User")
+
+    if user and SUPERVISOR_USERS and user in SUPERVISOR_USERS:
+        return True
+    if ip and ALLOWED_EDITOR_IPS and ip in ALLOWED_EDITOR_IPS:
+        return True
+    if DEV_ALLOW_LOCAL_EDITOR and ip in ("127.0.0.1", "::1"):
+        return True
+    return False
+
+@app.get("/me")
+async def me(request: Request):
+    """
+    回傳前端需要的身分資訊，讓前端決定是否開啟編輯 UI
+    """
+    ip = get_client_ip(request)
+    user = request.headers.get("X-Remote-User") or request.headers.get("Remote-User")
+    return JSONResponse({
+        "client_ip": ip,
+        "user": user,
+        "env": DEPLOY_ENV,
+        "is_editor": is_editor(request)
+    })
+
+
 @app.get("/favicon.ico")
 async def favicon():
     return RedirectResponse(url="/static/app.ico")
@@ -514,3 +570,55 @@ async def parse_pins(
 
     return JSONResponse({"valid_pins": valid_pins, "invalid_pins": invalid_pins})
 
+# === 注意事項（operation / bonding）讀寫 ===
+DEFAULT_NOTES = {
+    "operation": "（預設）這裡放操作注意事項的說明，供主管編輯…",
+    "bonding": "（預設）這裡放 bonding 注意事項的說明，供主管編輯…"
+}
+
+@app.get("/notices")
+async def get_notices(session_id: str):
+    """讀取某次上傳(session)的注意事項；若尚未建立則回預設。"""
+    sess_dir = os.path.join(UPLOAD_DIR, session_id)
+    path = os.path.join(sess_dir, "notices.json")
+    data = DEFAULT_NOTES.copy()
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                saved = json.load(f)
+                if isinstance(saved, dict):
+                    data.update(saved)  # 以已保存內容覆蓋預設
+        except Exception:
+            pass
+    return JSONResponse(data)
+
+@app.post("/notices")
+async def save_notices(
+    request: Request,
+    session_id: str = Form(...),
+    key: str = Form(...),           # "operation" 或 "bonding"
+    text: str = Form(...),
+):
+    """儲存單一類別的注意事項；只有 is_editor 的來源 IP 可寫入。"""
+    if not is_editor(request):      # 你現有的 is_editor() 會判斷來源 IP & 環境
+        return JSONResponse({"error": "forbidden"}, status_code=403)
+    if key not in ("operation", "bonding"):
+        return JSONResponse({"error": "invalid key"}, status_code=400)
+
+    sess_dir = os.path.join(UPLOAD_DIR, session_id)
+    os.makedirs(sess_dir, exist_ok=True)
+    path = os.path.join(sess_dir, "notices.json")
+
+    data = {}
+    if os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f) or {}
+        except Exception:
+            data = {}
+
+    data[key] = text
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+    return JSONResponse({"ok": True})

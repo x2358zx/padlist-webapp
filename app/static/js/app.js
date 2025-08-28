@@ -48,6 +48,176 @@ function sizeFromChipUm(w_um, h_um) {
 let MINMAX_OFFSET = { left:0, right:0, top:0, bottom:0 };
 // 例：若圖片四邊各有 ~3px 留白，可改成 {left:3, right:3, top:3, bottom:3}
 
+// === 編輯權限：從 /me 取得當前使用者是否可編輯 ===
+let IS_EDITOR = false;
+
+/**
+ * 向後端詢問身分，若可編輯：套用 .edit-enabled，並讓標記 data-editable 的元素可編輯
+ * 你可以在要讓主管編輯的區塊加上 data-editable 屬性
+ * 例：<div class="note" data-editable>...</div>
+ */
+async function checkEditor(){
+  try{
+    const r = await fetch("/me", { cache: "no-store" });
+    if(!r.ok) throw new Error("HTTP " + r.status);
+    const me = await r.json();
+    IS_EDITOR = !!me?.is_editor;
+
+    // 切換 body 的狀態 class（可用 CSS 做提示）
+    document.body.classList.toggle("edit-enabled", IS_EDITOR);
+
+    // 切換所有 data-editable 的元素
+    // 只開放內容區，不要把 header/按鈕設成可編輯
+    document.querySelectorAll(
+      "[data-editable]:not(button):not(summary):not(.acc-header):not(.acc-content):not([role='button'])"
+    ).forEach(el=>{
+      if (IS_EDITOR) {
+        el.setAttribute("contenteditable","true");
+        el.classList.add("editable");
+      } else {
+        el.removeAttribute("contenteditable");
+        el.classList.remove("editable");
+      }
+    });
+    
+    // 主管操作列（編輯/儲存/取消）— 有權限才顯示
+    document.querySelectorAll(".acc-actions").forEach(el=>{
+      el.hidden = !IS_EDITOR;
+    });
+
+  }catch(err){
+    console.warn("[checkEditor] failed:", err);
+    IS_EDITOR = false; // 安全預設
+  }
+}
+
+// === 注意事項：預設值（沒有檔案時用） ===
+const DEFAULT_NOTICES = {
+  operation: "（預設）操作注意事項：\n1) …\n2) …",
+  bonding:   "（預設）bonding 注意事項：\n1) …\n2) …"
+};
+
+// 讀取目前 session 的注意事項（若還沒有 session，就用 localStorage 暫存）
+async function loadNotices() {
+  let data = {...DEFAULT_NOTICES};
+
+  if (window.SESSION_ID) {
+    try {
+      const r = await fetch(`/notices?session_id=${encodeURIComponent(SESSION_ID)}`, { cache: "no-store" });
+      if (r.ok) data = await r.json();
+    } catch (e) { console.warn("loadNotices failed (server):", e); }
+  } else {
+    // 還沒上傳檔案前，允許用 localStorage 暫存（方便測試）
+    try {
+      const raw = localStorage.getItem("padlist_notices");
+      if (raw) data = {...data, ...JSON.parse(raw)};
+    } catch(e){}
+  }
+
+  const op = document.getElementById("notice-op");
+  const bd = document.getElementById("notice-bond");
+  if (op) op.textContent = data.operation || "";
+  if (bd) bd.textContent = data.bonding  || "";
+}
+
+// 讓 textarea 隨內容自動調整高度
+function autoResizeTextarea(ta){
+  if(!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight, Math.floor(window.innerHeight*0.6)) + 'px';
+}
+
+
+// 綁定「編輯/儲存/取消」；只有 is_editor 才看得到按鈕（checkEditor 已處理）
+function setupNoticeEditors() {
+  document.querySelectorAll("#noticesAcc .acc-item").forEach(item => {
+    const key     = item.querySelector(".acc-header")?.dataset.key;
+    const pre     = item.querySelector(".acc-content");
+    const editor  = item.querySelector(".acc-editor");
+    const actions = item.querySelector(".acc-actions");
+    const btnEdit   = item.querySelector(".acc-edit");
+    const btnSave   = item.querySelector(".acc-save");
+    const btnCancel = item.querySelector(".acc-cancel");
+    if (!key || !pre || !editor || !btnEdit || !btnSave || !btnCancel) return;
+
+    // 進入編輯
+    btnEdit.addEventListener("click", () => {
+      editor.value = pre.textContent;
+      pre.hidden = true; editor.hidden = false;
+      btnEdit.hidden = true; btnSave.hidden = false; btnCancel.hidden = false;
+      editor.focus();
+	  autoResizeTextarea(editor);
+      editor.addEventListener('input', () => autoResizeTextarea(editor), { once:false });
+    });
+
+    // 取消
+    btnCancel.addEventListener("click", () => {
+      editor.hidden = true; pre.hidden = false;
+      btnEdit.hidden = false; btnSave.hidden = true; btnCancel.hidden = true;
+    });
+
+    // 儲存
+    btnSave.addEventListener("click", async () => {
+      const text = editor.value;
+      // 立刻反映在畫面
+      pre.textContent = text;
+      editor.hidden = true; pre.hidden = false;
+      btnEdit.hidden = false; btnSave.hidden = true; btnCancel.hidden = true;
+
+      if (window.SESSION_ID) {
+        // 存到後端（限定 is_editor）
+        const fd = new FormData();
+        fd.append("session_id", SESSION_ID);
+        fd.append("key", key);
+        fd.append("text", text);
+        try {
+          const r = await fetch("/notices", { method: "POST", body: fd });
+          if (!r.ok) throw new Error("HTTP " + r.status);
+        } catch (e) {
+          console.error("save failed:", e);
+          alert("儲存失敗，請稍後再試。");
+        }
+      } else {
+        // 還沒上傳檔案的情境 → localStorage 暫存（方便測試）
+        try {
+          const raw = localStorage.getItem("padlist_notices");
+          const o = raw ? JSON.parse(raw) : {};
+          o[key] = text;
+          localStorage.setItem("padlist_notices", JSON.stringify(o));
+        } catch(e){}
+      }
+    });
+  });
+}
+
+
+function setupNoticesAccordion(){
+  const acc = document.getElementById("noticesAcc");
+  if(!acc) return;
+
+  const headers = acc.querySelectorAll(".acc-header");
+
+  headers.forEach(h=>{
+    h.addEventListener("click", ()=>{
+      const panel = h.nextElementSibling;
+      const expanded = h.getAttribute("aria-expanded") === "true";
+
+      // 關掉其它項目（只允許一個打開）
+      headers.forEach(other=>{
+        if(other !== h){
+          other.setAttribute("aria-expanded","false");
+          const p = other.nextElementSibling;
+          if(p) p.hidden = true;
+        }
+      });
+
+      // 切換自己
+      h.setAttribute("aria-expanded", String(!expanded));
+      if(panel) panel.hidden = expanded; // true=關, false=開
+    });
+  });
+}
+
 
 // 位置函式
 function posLeftLabel(i){  return { x: LEFT_LABEL_X,  y: LEFT_Y0  + i*STEP_V }; }
@@ -1037,7 +1207,12 @@ hideLoadBtn();
 document.getElementById("btnDownload").addEventListener("click", downloadPNG);
 document.getElementById("btnCopy").addEventListener("click", copyStageToClipboard);
 // --- MIN/MAX OFFSET UI wiring ---
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  await checkEditor(); // 先同步權限，再綁其它 UI（避免看到非主管卻能編輯）
+  setupNoticesAccordion();
+  setupNoticeEditors();
+  await loadNotices();
+
   const offsetAll   = document.getElementById('offsetAll');
   const offsetLink  = document.getElementById('offsetLink');
   const offsetTop   = document.getElementById('offsetTop');

@@ -3,9 +3,40 @@ services:
   padlist-webapp:
     build: .
     container_name: padlist-webapp
-    ports:
-      - "8000:8000"
+    # 開發期保留直連 8000:8000 方便你繞過 nginx 測試；正式要用 nginx 時可註解掉這行
+    #ports:
+    #  - "8000:8000"
     restart: unless-stopped
-    # 如果要用本機檔案暫存上傳內容，可開啟下行 volumes
+    volumes:
+      - ./uploads:/app/uploads   # 讓 notices.json 永久落在宿主機
+    environment:
+      # ★ 反向代理下要信任 X-Forwarded-*，FastAPI 會使用
+      - TRUST_PROXY=1
+      # ★ 部署環境標記（test/prod），純顯示用
+      - DEPLOY_ENV=${DEPLOY_ENV:-test}
+      # ★ 可以用 AD 帳號名做白名單（例如 MSI\User）
+      - SUPERVISOR_USERS=${SUPERVISOR_USERS:-}
+      # ★ 允許開啟編輯的 IP 清單（逗號分隔），例：192.168.10.23,203.66.77.88
+      - ALLOWED_EDITOR_IPS=${ALLOWED_EDITOR_IPS:-}
+      # ★ 本機測試允許 localhost 自動成編輯者
+      - DEV_ALLOW_LOCAL_EDITOR=${DEV_ALLOW_LOCAL_EDITOR:-1}
+
+    # 若要把上傳目錄持久化可開啟
     # volumes:
     #   - ./app/uploads:/app/uploads
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: padlist-proxy
+    depends_on:
+      - padlist-webapp
+    ports:
+      # Windows 開發用 8080，Linux 正式可改成 "80:80"
+      - "8002:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro  # ← 單檔掛對位置
+    restart: unless-stopped
+
+networks:
+  default:
+    driver: bridge
