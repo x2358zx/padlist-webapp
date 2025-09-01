@@ -97,28 +97,21 @@ const DEFAULT_NOTICES = {
   bonding:   "（預設）bonding 注意事項：\n1) …\n2) …"
 };
 
-// 讀取目前 session 的注意事項（若還沒有 session，就用 localStorage 暫存）
+// 讀取全站注意事項
 async function loadNotices() {
-  let data = {...DEFAULT_NOTICES};
-
-  if (window.SESSION_ID) {
-    try {
-      const r = await fetch(`/notices?session_id=${encodeURIComponent(SESSION_ID)}`, { cache: "no-store" });
-      if (r.ok) data = await r.json();
-    } catch (e) { console.warn("loadNotices failed (server):", e); }
-  } else {
-    // 還沒上傳檔案前，允許用 localStorage 暫存（方便測試）
-    try {
-      const raw = localStorage.getItem("padlist_notices");
-      if (raw) data = {...data, ...JSON.parse(raw)};
-    } catch(e){}
+  let data = { ...DEFAULT_NOTICES };
+  try {
+    const r = await fetch(`/notices`, { cache: "no-store" });
+    if (r.ok) data = await r.json();
+  } catch (e) {
+    console.warn("loadNotices failed:", e);
   }
-
   const op = document.getElementById("notice-op");
   const bd = document.getElementById("notice-bond");
   if (op) op.textContent = data.operation || "";
   if (bd) bd.textContent = data.bonding  || "";
 }
+
 
 // 讓 textarea 隨內容自動調整高度
 function autoResizeTextarea(ta){
@@ -159,34 +152,25 @@ function setupNoticeEditors() {
     // 儲存
     btnSave.addEventListener("click", async () => {
       const text = editor.value;
-      // 立刻反映在畫面
+      // 立刻反映到畫面
       pre.textContent = text;
       editor.hidden = true; pre.hidden = false;
       btnEdit.hidden = false; btnSave.hidden = true; btnCancel.hidden = true;
-
-      if (window.SESSION_ID) {
-        // 存到後端（限定 is_editor）
-        const fd = new FormData();
-        fd.append("session_id", SESSION_ID);
-        fd.append("key", key);
-        fd.append("text", text);
-        try {
-          const r = await fetch("/notices", { method: "POST", body: fd });
-          if (!r.ok) throw new Error("HTTP " + r.status);
-        } catch (e) {
-          console.error("save failed:", e);
-          alert("儲存失敗，請稍後再試。");
-        }
-      } else {
-        // 還沒上傳檔案的情境 → localStorage 暫存（方便測試）
-        try {
-          const raw = localStorage.getItem("padlist_notices");
-          const o = raw ? JSON.parse(raw) : {};
-          o[key] = text;
-          localStorage.setItem("padlist_notices", JSON.stringify(o));
-        } catch(e){}
+    
+      // 固定寫到後端（全站共用）
+      const fd = new FormData();
+      fd.append("key", key);
+      fd.append("text", text);
+    
+      try {
+        const r = await fetch("/notices", { method: "POST", body: fd });
+        if (!r.ok) throw new Error("HTTP " + r.status);
+      } catch (e) {
+        console.error("save failed:", e);
+        alert("儲存失敗（可能沒有編輯權限或伺服器無法寫入）。請聯絡管理者。");
       }
     });
+
   });
 }
 

@@ -9,6 +9,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./uploads:/app/uploads   # 讓 notices.json 永久落在宿主機
+      - ./data:/app/data
     environment:
       # ★ 反向代理下要信任 X-Forwarded-*，FastAPI 會使用
       - TRUST_PROXY=1
@@ -20,6 +21,7 @@ services:
       - ALLOWED_EDITOR_IPS=${ALLOWED_EDITOR_IPS:-}
       # ★ 本機測試允許 localhost 自動成編輯者
       - DEV_ALLOW_LOCAL_EDITOR=${DEV_ALLOW_LOCAL_EDITOR:-1}
+      - NOTICES_FILE=/app/data/notices.json   # << 新增：指定全站 notices.json 的絕對路徑
 
     # 若要把上傳目錄持久化可開啟
     # volumes:
