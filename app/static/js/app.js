@@ -561,6 +561,7 @@ function drawCircle(x,y,r,color="#f00", tag=null){
   c.setAttribute("r", r); c.setAttribute("fill", color);
   if(tag) c.dataset.tag = tag;
   overlay.appendChild(c);
+  return c; // ← 回傳元素，之後可設 dataset.ring
 }
 function drawText(x,y,txt,color="#00f"){
   const t = document.createElementNS("http://www.w3.org/2000/svg","text");
@@ -577,6 +578,7 @@ function drawLine(x1,y1,x2,y2,color="#f00", width=2, tag=null){
   l.setAttribute("stroke", color); l.setAttribute("stroke-width", width);
   if(tag) l.dataset.tag = tag;
   overlay.appendChild(l);
+  return l; // ← 回傳元素，之後可設 dataset.ring
 }
 
 // ====== Geometry ======
@@ -594,6 +596,147 @@ function imgRect(){
   const top = chipImage.offsetTop;
   return {left, top, right:left+w, bottom: top+h, width:w, height:h};
 }
+
+// === Ring detection (內/外圈自動辨識) ===
+// 使用十分位/九十分位當作"外/內"代表值，較不受極端值影響
+const RING_Q_OUTER = 0.10;
+const RING_Q_INNER = 0.90;
+
+// === Ring color mapping：以使用者選色為基底，內圈=偏亮、外圈=偏暗 ===
+// 將兩個 hex 顏色依權重混合（w ∈ [0,1]）
+function mixHex(c1, c2, w){
+  const toRgb = (h)=>{
+    h = String(h || "").replace("#","");
+    if(h.length===3) h = h.split("").map(ch => ch+ch).join("");
+    const r = parseInt(h.slice(0,2),16), g = parseInt(h.slice(2,4),16), b = parseInt(h.slice(4,6),16);
+    return {r,g,b};
+  };
+  const rgb1 = toRgb(c1), rgb2 = toRgb(c2);
+  const r = Math.round(rgb1.r*(1-w) + rgb2.r*w);
+  const g = Math.round(rgb1.g*(1-w) + rgb2.g*w);
+  const b = Math.round(rgb1.b*(1-w) + rgb2.b*w);
+  const toHex = (n)=> n.toString(16).padStart(2,"0");
+  return "#" + toHex(r) + toHex(g) + toHex(b);
+}
+
+// 回傳圈別顏色（外圈=使用者選色；內圈=對應色）
+function ringMate(baseHex){
+  const b = String(baseHex || "").toUpperCase();
+  if (b === "#BEBEBE") return "#00EC00"; // 灰 → 內圈用綠
+  if (b === "#00EC00") return "#00CACA"; // 綠 → 內圈用藍綠
+  if (b === "#00CACA") return "#BEBEBE"; // 藍綠 → 內圈用灰
+  return "#00EC00"; // 其它自訂顏色時，內圈預設配綠
+}
+function ringColor(baseHex, ring){
+  const base = baseHex || "#BEBEBE";
+  if (ring === "inner") return ringMate(base);
+  if (ring === "outer") return base;    // 外圈用使用者顏色
+  return base;                           // unknown 時就用使用者顏色
+}
+
+
+// 內/外圈顏色（如果你有既定色彩規範可換）
+const RING_COLORS = { inner: "#1f9d55", outer: "#e67e22" }; // 內=綠、外=橘
+
+// 1D 分位數工具
+function quantile(sorted, q){
+  if (!sorted.length) return null;
+  const i = Math.max(0, Math.min(sorted.length - 1, Math.round((sorted.length - 1) * q)));
+  return sorted[i];
+}
+
+// 回傳四邊 rails：left/right 用 x 值，top/bottom 用 y 值
+function computeRingRails(chipW, chipH){
+  const acc = { left:[], right:[], top:[], bottom:[] };
+
+  // 依 pin 所在的 side（看其對應的 label 盒子的 class）把座標丟進去
+  (VALID_PINS || []).forEach(p=>{
+    const box = inputsByLabel.get(p.pin_no) || inputsByLabelNorm.get(normLabel(p.pin_no));
+    if(!box) return;
+    const pt = chipToStage(p.x, p.y, chipW, chipH); // stage 座標
+    if(!pt) return;
+
+    if (box.classList.contains("side-left"))   acc.left.push(pt.x);
+    else if (box.classList.contains("side-right"))  acc.right.push(pt.x);
+    else if (box.classList.contains("side-top"))    acc.top.push(pt.y);
+    else if (box.classList.contains("side-bottom")) acc.bottom.push(pt.y);
+  });
+
+  // 轉成分位數（先排序）
+  const sortAsc = (a,b)=>a-b;
+  const L = acc.left.sort(sortAsc), R = acc.right.sort(sortAsc);
+  const T = acc.top.sort(sortAsc),  B = acc.bottom.sort(sortAsc);
+
+  // === 改用「雙中位數」來抓兩條軌道（更抗離群值，也不會把下側抬高） ===
+  function median(arr){ const n=arr.length; if(!n) return null; const m=Math.floor(n/2); return n%2 ? arr[m] : (arr[m-1]+arr[m])/2; }
+  function splitMedians(sorted){
+    if(sorted.length < 2) return { low:null, high:null };
+    const mid = Math.floor(sorted.length/2);
+    return { low: median(sorted.slice(0,mid)), high: median(sorted.slice(mid)) };
+  }
+  const mL = splitMedians(L), mR = splitMedians(R), mT = splitMedians(T), mB = splitMedians(B);
+  // 規則：left/top 內圈=較靠中心（left: x 大、top: y 大）；right/bottom 內圈=較靠中心（right: x 小、bottom: y 小[舞台座標]）
+  const rails = {
+    left  : { outer: mL.low  ?? quantile(L, RING_Q_OUTER),    inner: mL.high ?? quantile(L, RING_Q_INNER)  },
+    right : { outer: mR.high ?? quantile(R, 1-RING_Q_OUTER),  inner: mR.low  ?? quantile(R, RING_Q_OUTER)  },
+    top   : { outer: mT.low  ?? quantile(T, RING_Q_OUTER),    inner: mT.high ?? quantile(T, RING_Q_INNER)  },
+    bottom: { outer: mB.high ?? quantile(B, 1-RING_Q_OUTER),  inner: mB.low  ?? quantile(B, RING_Q_OUTER)  },
+  };
+
+  // 任一邊缺資料就視為無法分圈
+  if ([rails.left, rails.right, rails.top, rails.bottom].some(v => !v.outer || !v.inner)) return null;
+  return rails;
+}
+
+// 由 rails 算出外框/內框矩形
+function buildRingRects(rails){
+  return {
+    outer: { left: rails.left.outer, right: rails.right.outer, top: rails.top.outer, bottom: rails.bottom.outer },
+    inner: { left: rails.left.inner, right: rails.right.inner, top: rails.top.inner, bottom: rails.bottom.inner },
+  };
+}
+
+// 依 side 與座標值判定圈別
+function decideRing(side, value, rails){
+  if(!rails || !rails[side]) return "unknown";
+  const r = rails[side];
+  const mid = (r.inner + r.outer) / 2;
+  // 內圈規則：靠中心
+  if (side === "left" || side === "top") {
+    // 左/上：中心方向是「數值比較大」
+    return (value >= mid) ? "inner" : "outer";
+  } else if (side === "right" || side === "bottom") {
+    // 右/下：中心方向是「數值比較小」（舞台座標 y 往下變大）
+    return (value <= mid) ? "inner" : "outer";
+  }
+  return "unknown";
+}
+
+// 畫矩形框（便於除錯/給使用者信心）
+function drawRect(left, top, right, bottom, color, dashed=false, tag=null){
+  const rect = document.createElementNS("http://www.w3.org/2000/svg","rect");
+  rect.setAttribute("x", left);
+  rect.setAttribute("y", top);
+  rect.setAttribute("width",  Math.max(0, right-left));
+  rect.setAttribute("height", Math.max(0, bottom-top));
+  rect.setAttribute("fill", "none");
+  rect.setAttribute("stroke", color);
+  rect.setAttribute("stroke-width", 1);
+  if(dashed) rect.setAttribute("stroke-dasharray","4 2");
+  if(tag) rect.dataset.tag = tag;
+  overlay.appendChild(rect);
+  return rect;
+}
+
+// 取 label 盒子的 side 文字（left/right/top/bottom）
+function getBoxSide(box){
+  if (box.classList.contains("side-left"))   return "left";
+  if (box.classList.contains("side-right"))  return "right";
+  if (box.classList.contains("side-top"))    return "top";
+  if (box.classList.contains("side-bottom")) return "bottom";
+  return null;
+}
+
 
 // 依圖片邊界自動設定 MIN/MAX：MIN=左下角、MAX=右上角
 function setMinMaxToImage() {
@@ -757,16 +900,26 @@ function segIntersect(A,B){
 }
 
 function checkLineIntersections(){
-  const lines = getOverlayLines();
-  // 不要清 .conflict，避免蓋掉「轉角互斥」；只把需要的線再加上 .conflict
-  for(let i=0;i<lines.length;i++){
-    for(let j=i+1;j<lines.length;j++){
-      if (segIntersect(lines[i], lines[j])){
-        lines[i].el.classList.add('conflict');
-        lines[j].el.classList.add('conflict');
+  const lines = getOverlayLines(); // {x1,y1,x2,y2, el, tag}
+  // 依 data-ring 分組，只在同組內檢查交叉
+  const groups = { inner: [], outer: [], unknown: [] };
+  lines.forEach(L => {
+    const ring = L.el.dataset.ring || "unknown";
+    (groups[ring] || groups.unknown).push(L);
+  });
+  const scan = (arr)=>{
+    for(let i=0;i<arr.length;i++){
+      for(let j=i+1;j<arr.length;j++){
+        if (segIntersect(arr[i], arr[j])){
+          arr[i].el.classList.add('conflict');
+          arr[j].el.classList.add('conflict');
+        }
       }
     }
-  }
+  };
+  scan(groups.inner);
+  scan(groups.outer);
+  // unknown 跟任何圈不互檢，避免誤爆
 }
 
 
@@ -857,20 +1010,36 @@ function drawPinsAndLines(){
   const chipW = Number(chipWidthEl.value), chipH = Number(chipHeightEl.value);
   if(!chipW || !chipH || !MIN_POINT || !MAX_POINT) return;
 
+  // ① 計算內/外圈 rails + 兩個方形框
+  const rails = computeRingRails(chipW, chipH);
+  const rects = rails ? buildRingRects(rails) : null;
+  if (rects){
+    // 參考線（外橘內綠、虛線）：不影響主流程
+    drawRect(rects.outer.left, rects.outer.top, rects.outer.right, rects.outer.bottom, RING_COLORS.outer, true, "RING_OUTER");
+    drawRect(rects.inner.left, rects.inner.top, rects.inner.right, rects.inner.bottom, RING_COLORS.inner, true, "RING_INNER");
+  }
+
   VALID_PINS.forEach(p => {
     const pt = chipToStage(p.x, p.y, chipW, chipH);
     if(!pt) return;
-    // ★ Pins 用可調半徑與顏色
-    drawCircle(pt.x, pt.y, pinDotRadius(), PIN_STYLE_COLOR, `PIN_${p.pin_no}`);
 
-    // 以「pin 盒子 .pin-box」為對象，連到內側邊緣
+    // ② 依圈別決定顏色（unknown 則維持預設色）
     const boxEl = inputsByLabel.get(p.pin_no) || inputsByLabelNorm.get(normLabel(p.pin_no));
-    if (boxEl) {
-      const anchor = innerAnchorOfBox(boxEl); // 內側錨點
-      // ★ Pins 用可調線寬與顏色
-      drawLine(pt.x, pt.y, anchor.x, anchor.y, PIN_STYLE_COLOR, pinLineWidth(), `LINE_${p.pin_no}`);
+    const side  = boxEl ? getBoxSide(boxEl) : null;
+    let ring    = "unknown";
+    if (rects && side){
+      const axisVal = (side === "left" || side === "right") ? pt.x : pt.y;
+      ring = decideRing(side, axisVal, rails);
+    }
+    // 以「使用者選色」為基底：內圈偏亮、外圈偏暗；unknown 就用原色
+    const color = ringColor(PIN_STYLE_COLOR, ring);
+    const dotEl = drawCircle(pt.x, pt.y, pinDotRadius(), color, `PIN_${p.pin_no}`);
+    if (dotEl) dotEl.dataset.ring = ring;
     
-      // （可選）讓對應的標籤加粗
+    if (boxEl) {
+      const anchor = innerAnchorOfBox(boxEl); // 內側錨點（既有）
+      const lineEl = drawLine(pt.x, pt.y, anchor.x, anchor.y, color, pinLineWidth(), `LINE_${p.pin_no}`);
+      if (lineEl) lineEl.dataset.ring = ring; // ★ 標上圈別，供碰撞檢查用
       const labelDiv = labelDivsByLabel.get(p.pin_no);
       if (labelDiv) labelDiv.style.fontWeight = "700";
     }
