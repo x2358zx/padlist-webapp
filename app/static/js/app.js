@@ -15,6 +15,22 @@ const BASE_PIN_LINE_WIDTH = 1.0;  // 基準線寬
 // 目前樣式狀態（預設：1.5×、灰 #BEBEBE）
 let PIN_STYLE_SCALE = 1.5;
 let PIN_STYLE_COLOR = "#BEBEBE";
+// 顯示哪一圈的「連線」：'all' | 'inner' | 'outer'（不記憶，僅當次）
+let PIN_LINE_SCOPE = 'all';
+
+// === Debug Switches ===
+// 內/外圈的方形參考線（RING_OUTER / RING_INNER）預設不顯示
+let DEBUG_SHOW_RING_RECTS = false;
+
+/** 在 Console 或其他地方呼叫：
+ *   setRingDebug(true)  // 顯示參考方框
+ *   setRingDebug(false) // 隱藏參考方框
+ */
+window.setRingDebug = function(flag){
+  DEBUG_SHOW_RING_RECTS = !!flag;
+  if (typeof drawPinsAndLines === 'function') drawPinsAndLines(); // 立即重繪
+};
+console.log("輸入 setRingDebug(true); 可以顯示參考線");
 
 // 取當前點/線實際數值
 function pinDotRadius(){ return BASE_PIN_DOT_RADIUS * PIN_STYLE_SCALE; }
@@ -688,6 +704,22 @@ function computeRingRails(chipW, chipH){
   return rails;
 }
 
+// 判斷這張圖是否可明確分成「雙圈」
+function hasTwoRings(rails){
+  if (!rails) return false;
+  const TH = Math.max(2, pinLineWidth()); // 門檻：至少 2px 或當前線寬，避免誤差
+  const sides = ["left","right","top","bottom"];
+  let strong = 0;
+  for (const s of sides){
+    const r = rails[s];
+    if (!r || !isFinite(r.inner) || !isFinite(r.outer)) return false; // 少資料 → 視為無法分圈
+    if (Math.abs(r.inner - r.outer) >= TH) strong++;
+  }
+  // 至少有兩個側邊能清楚拉開，才視為雙圈
+  return strong >= 2;
+}
+
+
 // 由 rails 算出外框/內框矩形
 function buildRingRects(rails){
   return {
@@ -1002,6 +1034,8 @@ viewToggleBtn?.addEventListener('click', ()=>{
 // ====== Draw pins and lines ======
 function drawPinsAndLines(){
   clearOverlay();
+  // 先把所有側邊標籤字重還原，避免殘留粗體
+  labelDivsByLabel.forEach(div => { div.style.fontWeight = "400"; });
   // draw MIN/MAX (藍點)
   // ★ MIN/MAX 固定藍色與固定半徑（MINMAX_DOT_RADIUS）
   if(MIN_POINT){ drawCircle(MIN_POINT.x, MIN_POINT.y, pinDotRadius(), "#00f"); drawText(MIN_POINT.x+5, MIN_POINT.y-5, "MIN","#00f"); }
@@ -1013,7 +1047,13 @@ function drawPinsAndLines(){
   // ① 計算內/外圈 rails + 兩個方形框
   const rails = computeRingRails(chipW, chipH);
   const rects = rails ? buildRingRects(rails) : null;
-  if (rects){
+  // === 只有單圈 → 鎖定「全部」並停用選單；有雙圈 → 可切換 ===
+  const twoRings = hasTwoRings(rails);
+  updatePinScopeLock(twoRings);
+  
+  // 只有在 Debug 開啟時才畫出方形參考線（預設不畫）
+  // 註：不影響分圈與主流程，只是視覺上的參考
+  if (rects && DEBUG_SHOW_RING_RECTS){
     // 參考線（外橘內綠、虛線）：不影響主流程
     drawRect(rects.outer.left, rects.outer.top, rects.outer.right, rects.outer.bottom, RING_COLORS.outer, true, "RING_OUTER");
     drawRect(rects.inner.left, rects.inner.top, rects.inner.right, rects.inner.bottom, RING_COLORS.inner, true, "RING_INNER");
@@ -1035,20 +1075,51 @@ function drawPinsAndLines(){
     const color = ringColor(PIN_STYLE_COLOR, ring);
     const dotEl = drawCircle(pt.x, pt.y, pinDotRadius(), color, `PIN_${p.pin_no}`);
     if (dotEl) dotEl.dataset.ring = ring;
+	
+	if (boxEl) {
+    const anchor = innerAnchorOfBox(boxEl); // 內側錨點（既有）
     
-    if (boxEl) {
-      const anchor = innerAnchorOfBox(boxEl); // 內側錨點（既有）
+    // === 新增：顯示線篩選（只影響連線，不影響點/參考虛線） ===
+    // ring 可能是 'inner' / 'outer' / 'unknown'
+    // - 當 PIN_LINE_SCOPE 為 'inner' 或 'outer' 時，只有對應圈別才畫線
+    // - 'unknown' 僅在 'all' 模式才會畫線（避免誤判）
+    if (
+      PIN_LINE_SCOPE !== 'all' &&
+      ring !== PIN_LINE_SCOPE // 不同圈別就跳過畫線
+    ) {
+      // 不畫線，但點已在上面照常畫出
+    } else {
       const lineEl = drawLine(pt.x, pt.y, anchor.x, anchor.y, color, pinLineWidth(), `LINE_${p.pin_no}`);
-      if (lineEl) lineEl.dataset.ring = ring; // ★ 標上圈別，供碰撞檢查用
-      const labelDiv = labelDivsByLabel.get(p.pin_no);
-      if (labelDiv) labelDiv.style.fontWeight = "700";
+      if (lineEl) lineEl.dataset.ring = ring; // 保留 dataset，供紅線/碰撞檢查用
+	  const labelDiv = labelDivsByLabel.get(p.pin_no); //使連到的標籤加粗
+	  if (labelDiv) labelDiv.style.fontWeight = "700";
     }
+}
 
   });
   
   checkCornerExclusive();     // 先做轉角互斥（會清掉舊 .conflict 再套角落高亮）
   checkLineIntersections();   // 再做「線交叉」→ 把交叉線也加上 .conflict 高亮
 }
+
+function updatePinScopeLock(twoRings) {
+  const sels = document.querySelectorAll('#pinLineScope'); // 就算誤有兩個，一次處理
+  if (!sels.length) return;
+  if (!twoRings) {
+    sels.forEach(sel => {
+      sel.disabled = true;
+      sel.value = 'all';
+      sel.title = '偵測到單圈：僅能顯示全部';
+    });
+    PIN_LINE_SCOPE = 'all';
+  } else {
+    sels.forEach(sel => {
+      sel.disabled = false;
+      sel.title = '';
+    });
+  }
+}
+
 
 // === 用 html2canvas 把 #stage 直接截圖（所見即所得） ===
 // 為了避免 <input> 的 baseline 偏移，截圖時用 clone，把 .pin-input 改成 .pin-box
@@ -1384,12 +1455,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // === Pin Style UI 綁定 ===
   const scaleSel = document.getElementById('pinStyleScale');
   const colorRadios = document.querySelectorAll('input[name="pinStyleColor"]');
+  const scopeSel = document.getElementById('pinLineScope'); // ← 新增：顯示線篩選
 
   // ★ 讓外部（切檔/切表）也能把 Pin 樣式回預設並同步 UI
 window.resetPinStyle = function () {
   // 預設：1.5× 與 #BEBEBE（與你的常數初始值一致）
   PIN_STYLE_SCALE = 1.5;
   PIN_STYLE_COLOR = "#BEBEBE";
+  
+  // 同步 UI：顯示線（可選）— 回到全部
+  if (typeof scopeSel !== 'undefined' && scopeSel) {
+    scopeSel.value = 'all';
+  }
+  PIN_LINE_SCOPE = 'all';
 
   // （可選）清掉過去可能殘留的快取，避免混淆
   try { localStorage.removeItem('pin_style'); } catch(e){}
@@ -1554,6 +1632,25 @@ window.resetPinStyle = function () {
       }
     });
   });
+  
+  // 顯示線（不存偏好，不記憶）— 改變就重畫
+  document.querySelectorAll('#pinLineScope').forEach(sel => {
+    sel.addEventListener('change', () => {
+      if (sel.disabled) {
+        sel.value = 'all';
+        PIN_LINE_SCOPE = 'all';
+        drawPinsAndLines?.();
+        return;
+      }
+      PIN_LINE_SCOPE = sel.value || 'all';
+      // 同步其他下拉（若未來又誤植複本，也不會不同步）
+      document.querySelectorAll('#pinLineScope').forEach(s2 => {
+        if (s2 !== sel) s2.value = PIN_LINE_SCOPE;
+      });
+      drawPinsAndLines?.();
+    });
+  });
+
 
   // init
   loadOffset();

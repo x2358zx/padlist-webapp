@@ -710,3 +710,71 @@ border-radius:4px;
 #overlay rect[data-tag="RING_INNER"] { 
   pointer-events: none;
 }*/
+/* 只有單圈的時候會禁止使用下拉選單(增強) */
+select:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+
+/* --- 版本標籤與自訂提示框的陽光暖暖樣式 --- */
+
+/* 讓 a 標籤沒有底線且顏色繼承 */
+.version-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* 讓 version-badge 成為提示框的定位基準 */
+.version-badge {
+  position: relative;
+}
+
+/* 讓 a 標籤沒有底線且顏色繼承 */
+.version-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* 讓 version-badge 成為提示框的定位基準 */
+.version-badge {
+  position: relative;
+}
+
+/* 提示框本體 (修改後在下方) */
+.version-badge::after {
+  content: attr(data-tooltip); /* 讀取 data-tooltip 的內容 */
+  position: absolute;
+  top: 100%; /* ★ 修改：從頂部往下 100%，定位於下方 */
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 8px; /* ★ 新增：與膠囊之間增加 8px 的間距 */
+
+  /* 陽光暖暖的樣式 (參考 .accordion) */
+  background: linear-gradient(180deg, #FFEDBF, #FFF8E1);
+  border: 1px solid #f3d28a;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.1);
+  color: #2f261a;
+
+  /* 文字與排版 */
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 10px 14px;
+  white-space: pre-wrap; /* 讓 &#xa; 可以成功換行 */
+  text-align: center;
+  width: max-content; /* 寬度由內容決定 */
+  z-index: 100; /* 確保在最上層 */
+
+  /* 動畫效果 */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out, margin-top 0.2s ease-in-out; /* ★ 新增 margin-top 動畫 */
+}
+
+/* 滑鼠移上去時，顯示提示框 */
+.version-badge:hover::after {
+  opacity: 1;
+  visibility: visible;
+  margin-top: 12px; /* ★ 修改：向下微移，創造一個 "掉落" 的感覺 */
+}
