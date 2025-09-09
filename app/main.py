@@ -12,12 +12,19 @@ from fastapi.templating import Jinja2Templates
 from openpyxl import load_workbook
 from openpyxl.utils.cell import coordinate_from_string
 from openpyxl.utils import get_column_letter
+from openpyxl.styles import Font  # ★ 新增：設定 A1 字體大小用
 from PIL import Image
 
 import json
 import posixpath as pp
 import xml.etree.ElementTree as ET
 import re
+
+from fastapi import HTTPException
+from openpyxl.drawing.image import Image as XLImage
+
+from datetime import datetime
+
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
@@ -360,6 +367,7 @@ async def upload_excel(file: UploadFile = File(...)):
         # 讀 workbook，建立「每表最大圖」對應（只列出有圖的工作表）
         wb = load_workbook(saved_path, data_only=True)
         sheets_with_img_ordered, map_name_to_saved = _build_sheet_image_map(saved_path, sess_dir)
+        all_sheets = list(wb.sheetnames)  # ★ 新增：所有分頁名
 
         # 將對應表存成 json，給 /sheet_info 使用
         mapping_json = os.path.join(sess_dir, "sheet_images.json")
@@ -377,11 +385,123 @@ async def upload_excel(file: UploadFile = File(...)):
             "session_id": sid,
             # 僅包含「有圖」的工作表，前端下拉就不會出現沒圖的表
             "sheets": sheets_with_img_ordered,
+            "all_sheets": all_sheets,            # ★ 新增：所有分頁（給前端做 1to1/1to9 防呆）
             # 初始圖（第一個工作表的「最大張」）
             "default_image_url": default_image_url
         })
     except Exception as e:
         return JSONResponse({"error": f"Failed to read Excel: {type(e).__name__}: {e}"}, status_code=400)
+
+@app.post("/excel/paste_snapshot")
+async def excel_paste_snapshot(
+    session_id: str = Form(...),
+    sheet_name: Optional[str] = Form(None),
+    # target_height_cm: float = Form(18.0),  # ★ 舊參數保留也可，但本文不再使用
+    img: UploadFile = File(None),
+    img_left: UploadFile = File(None),
+    img_right: UploadFile = File(None),
+):
+    """
+    新版行為：
+    - 若同時收到 img_left + img_right：分別建立兩個新工作表，各自貼圖（不改大小）。
+      * 1:1圖 分頁：A1 寫「1:1圖」（60pt），A2 放左圖，視圖縮放 30%
+      * 1:9圖 分頁：A1 寫「1:9圖」（60pt），A2 放右圖，視圖縮放 30%
+    - 若只收到 img：建立 1 個分頁，A1 寫「1:1圖」，A2 放此圖，視圖縮放 30%
+    - 不再進行合併與依公分高度縮放。
+    """
+    # 1) 檢查 session / workbook 是否存在
+    sess_dir = os.path.join(UPLOAD_DIR, session_id)
+    wb_path  = os.path.join(sess_dir, "workbook.xlsx")
+    if not os.path.exists(wb_path):
+        raise HTTPException(status_code=400, detail="找不到此工作階段的 Excel 檔案")
+
+    # 2) 讀圖（移除透明、用白底鋪，維持原解析度）
+    def _read_img(buf: bytes) -> Image.Image:
+        im = Image.open(io.BytesIO(buf))
+        if im.mode in ("RGBA", "LA"):
+            bg = Image.new("RGB", im.size, (255, 255, 255))
+            bg.paste(im, mask=im.split()[-1])
+            return bg
+        return im.convert("RGB")
+
+    left_img = right_img = single_img = None
+    if img_left and img_right:
+        left_img  = _read_img(await img_left.read())
+        right_img = _read_img(await img_right.read())
+    elif img:
+        single_img = _read_img(await img.read())
+    else:
+        raise HTTPException(status_code=400, detail="沒有收到任何影像（img 或 img_left/img_right）")
+
+    # 3) 開啟 Excel
+    wb = load_workbook(wb_path)
+
+    # 取唯一名稱的小工具（沿用你原本的做法）
+    def _unique_sheetname(wb, base):
+        name = base
+        i = 1
+        while name in wb.sheetnames:
+            i += 1
+            name = f"{base} {i}"
+        return name
+
+    # 以目前選單的表名當 prefix，避免非法字元（: / ? * [ ] 等在 Excel 分頁名不允許）
+    prefix = (sheet_name or "Sheet").replace(":", "_").replace("/", "_").replace("\\", "_").replace("[", "(").replace("]", ")").replace("*", "_").replace("?", "_")
+
+    def _add_sheet_with_image(img_pil: Image.Image, title_text: str, sheet_suffix: str, tmp_filename: str):
+        """
+        在新分頁 A1 寫大字、A2 貼圖、視圖縮 30%。
+        img_pil：要貼的 PIL 圖
+        title_text：A1 文字（例如 "1:1圖"）
+        sheet_suffix：用來組成分頁名，如 "_1to1" / "_1to9"
+        tmp_filename：暫存 PNG 檔名
+        """
+        # 存成暫存檔（openpyxl 圖片建議從檔案或 PIL 物件）
+        out_png = os.path.join(sess_dir, tmp_filename)
+        img_pil.save(out_png, "PNG")
+
+        base_title = f"{prefix}{sheet_suffix}"
+        ws_title   = _unique_sheetname(wb, base_title)  # 例如 "AAA_1to1"
+        ws         = wb.create_sheet(title=ws_title)
+
+        # A1 放標題（60pt，大字）
+        ws["A1"].value = title_text
+        ws["A1"].font  = Font(size=60, bold=True)
+        # 粗略留一點高度，避免圖片壓到文字（單位：points）
+        ws.row_dimensions[1].height = 85
+
+        # 插入圖片（不改大小）→ 放在 A2，避免覆蓋 A1 的大字
+        xlimg = XLImage(out_png)
+        ws.add_image(xlimg, "A2")
+
+        # 視圖縮放 30%
+        try:
+            ws.sheet_view.zoomScale = 30
+            ws.sheet_view.zoomScaleNormal = 30
+        except Exception:
+            pass  # 某些版本只要設 zoomScale 即可
+
+        return ws_title
+
+    created_sheets = []
+    if left_img and right_img:
+        created_sheets.append(_add_sheet_with_image(left_img,  "1:1圖", "_1to1", "padlist_left.png"))
+        created_sheets.append(_add_sheet_with_image(right_img, "1:9圖", "_1to9", "padlist_right.png"))
+    else:
+        created_sheets.append(_add_sheet_with_image(single_img, "1:1圖", "_1to1", "padlist_single.png"))
+
+    # 4) 存檔並回傳
+    stamp     = datetime.now().strftime("%Y%m%d_%H%M%S")
+    out_xlsx  = os.path.join(sess_dir, f"workbook_with_snapshot_{stamp}.xlsx")
+    wb.save(out_xlsx)
+
+    return FileResponse(
+        out_xlsx,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=os.path.basename(out_xlsx),
+    )
+
+
 
 @app.get("/uploads/{sid}/{fname}")
 async def serve_upload(sid: str, fname: str):

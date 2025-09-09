@@ -272,6 +272,7 @@ const stageWrapper = document.getElementById("stageWrapper"); // 平移手勢掛
 
 
 let SESSION_ID = null;
+let CURRENT_FILE_NAME = ""; // ★ 新增：記住目前檔名（全域）
 let DISPLAY_SCALE = 1.0;
 let MIN_POINT = null; // {x,y}
 let MAX_POINT = null; // {x,y}
@@ -292,6 +293,13 @@ function nowTime(){
   const pad = (n)=> n.toString().padStart(2,"0");
   return `${dt.getFullYear()}/${pad(dt.getMonth()+1)}/${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
+function nowStamp() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  // yyyy-mm-dd-HHMMSS（避免用冒號，Windows/macOS 都安全）
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+
 document.getElementById("nowtime").textContent = nowTime();
 
 function setInvalidPins(list){
@@ -1173,6 +1181,70 @@ async function copyStageToClipboard() {
   }
 }
 
+// 將 canvas 轉 blob（PNG）
+async function canvasToBlob(canvas){
+  return await new Promise(res => canvas.toBlob(b => res(b), "image/png"));
+}
+
+// 以「目前視圖」把舞台區截成 canvas（沿用你現有的 html2canvas/渲染流程）
+async function captureStageBlobAtCurrentView(){
+  const canvas = await renderStageCanvas();   // 你專案既有的截圖函式
+  return await canvasToBlob(canvas);
+}
+
+// 主要流程：兩次截圖（1:1 與 放大），POST 到 API，拿回 Excel 檔案
+async function downloadExcelViaAPI(){
+  try {
+    if(!SESSION_ID){
+      setError("尚未上傳 Excel / 尚未建立 session"); // 你專案的錯誤顯示函式
+      return;
+    }
+    const sheet = (typeof sheetSelector !== "undefined" && sheetSelector?.value) ? sheetSelector.value : "";
+
+    // 記住原本視圖狀態
+    const prev = BIG_VIEW_MODE;
+
+    // 左圖：1:1 視圖
+    BIG_VIEW_MODE = false; 
+    applyViewMode();                          // 你專案用來套用 BIG_VIEW_MODE 的函式
+    await new Promise(r => requestAnimationFrame(()=>r())); // 等畫面更新
+    const leftBlob = await captureStageBlobAtCurrentView();
+
+    // 右圖：放大視圖（黃色區 0.9 倍）
+    BIG_VIEW_MODE = true; 
+    applyViewMode();
+    await new Promise(r => requestAnimationFrame(()=>r()));
+    const rightBlob = await captureStageBlobAtCurrentView();
+
+    // 回復原視圖（避免影響使用者）
+    BIG_VIEW_MODE = prev; 
+    applyViewMode();
+
+    // 組 FormData 打 API
+    const fd = new FormData();
+    fd.append("session_id", SESSION_ID);
+    fd.append("sheet_name", sheet);               // 後端用來取名新分頁
+    fd.append("img_left", leftBlob,  "view_1to1.png");
+    fd.append("img_right", rightBlob, "view_zoom.png");
+
+    const resp = await fetch("/excel/paste_snapshot", { method:"POST", body: fd });
+    if(!resp.ok){
+      const t = await resp.text();
+      throw new Error("伺服器錯誤：" + t);
+    }
+    const blob = await resp.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    const code = (projectCodeEl?.textContent || "padlist").trim() || "padlist";
+    a.download = `${code}_${nowStamp()}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch (err){
+    setError(err.message || String(err));
+  }
+}
+
+
 // 允許重新選擇同名檔案也會觸發 change（關鍵修正）
 // 放在 excelFile 的 change 綁定「前面」
 const excelInput = document.getElementById('excelFile');
@@ -1181,11 +1253,20 @@ excelInput.addEventListener('click', () => {
   excelInput.value = '';
 });
 
+// ★ 檢查是否已有「輸出後的分頁」（1to1 / 1to9）
+function hasGeneratedTabsFrom(data){
+  // 允許底線/空白/連字號作為邊界
+  const re = /(^|[_\s-])1to1($|[_\s-])|(^|[_\s-])1to9($|[_\s-])/i;
+  const names = [...new Set([...(data.all_sheets || []), ...(data.sheets || [])])];
+  return names.some(n => re.test(String(n || "")));
+}
+
 
 // ====== Event wiring ======
 document.getElementById("excelFile").addEventListener("change", async (e)=>{
   const f = e.target.files[0];
   if(!f){ return; }
+  CURRENT_FILE_NAME = f.name; // ★ 新增
   setError("");
   hideLoadBtn();           // 換新檔 → 先把載入資料按鈕藏起來
   // 先清空圖片，再清空 chip 欄位（避免先清欄位造成瞬間閃爍）
@@ -1201,7 +1282,17 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
   const data = await res.json();
   if(data.error){ setError(data.error); console.error("Server error:", data.error); return; }
   SESSION_ID = data.session_id;
+  // ★ 插入：偵測 1to1 / 1to9
+  if (hasGeneratedTabsFrom(data)) {
+  setError("偵測到1to1、1to9，請刪除後，再試一次");
+  sheetSelector.innerHTML = "";
+  chipImage.removeAttribute("src");
+  chipImage.classList.remove("loaded");
+  return;
+  }
+  
   setStatus("已選擇檔案: " + f.name);
+
 
   // 只填入「有圖的工作表」
   sheetSelector.innerHTML = "";
@@ -1305,7 +1396,7 @@ async function querySheetInfo(){
     clearOverlay(); MIN_POINT = null; MAX_POINT = null;
     VALID_PINS = []; INVALID_PINS = [];
     setInvalidPins([]);
-    setStatus("已載入：最大張圖片與 chip size；可直接按「2. 載入資料」");
+    setStatus(`已載入 ${CURRENT_FILE_NAME || "所選檔案"}：所選擇工作表中最大張圖片與 chip size；可直接按「2. 載入資料」`);
   }
 }
 
@@ -1430,6 +1521,8 @@ hideLoadBtn();
 // Download
 document.getElementById("btnDownload").addEventListener("click", downloadPNG);
 document.getElementById("btnCopy").addEventListener("click", copyStageToClipboard);
+document.getElementById("btnExcelApi").addEventListener("click", downloadExcelViaAPI);
+
 // --- MIN/MAX OFFSET UI wiring ---
 document.addEventListener('DOMContentLoaded', async () => {
   await checkEditor(); // 先同步權限，再綁其它 UI（避免看到非主管卻能編輯）

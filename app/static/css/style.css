@@ -778,3 +778,8 @@ select:disabled {
   visibility: visible;
   margin-top: 12px; /* ★ 修改：向下微移，創造一個 "掉落" 的感覺 */
 }
+
+/* 60% 複製按鈕 (與一般複製有點區別：青色系) */
+#btnExcelApi {
+  background: linear-gradient(135deg, #17a2b8, #117a8b);
+}
