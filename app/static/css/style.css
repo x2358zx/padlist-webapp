@@ -805,3 +805,7 @@ select:disabled {
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,.22);
 }
+
+/* ★ 當錯誤/一般訊息是空字串時，自動隱藏整列，避免殘影 */
+.status.error:empty,
+.status.normal:empty { display: none; }

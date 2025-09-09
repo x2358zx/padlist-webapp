@@ -306,6 +306,29 @@ function showInvalidGifOnce(){
 // ====== Helpers ======
 function setStatus(msg){ statusEl.textContent = msg; }
 function setError(msg){ errorEl.textContent = msg || ""; }
+// === 每次開始「新一輪載入 / 換檔 / 換表」前，清掉上一輪錯誤與提示 ===
+function resetErrorUIForNewLoad() {
+  // 1) 清錯誤文字列（#error）
+  if (typeof setError === 'function') setError("");
+
+  // 2) 關閉「無法連線 PIN」膠囊並清空內容
+  if (typeof setInvalidPins === 'function') setInvalidPins([]);  // 已內含 hidden 與清空
+
+  // 3) 保險：把膠囊殘留的樣式關閉（不同版本 class 可能不同，統一清）
+  const capsule = document.getElementById('invalidCapsule');
+  if (capsule) {
+    capsule.classList.remove('open','show','active','collapsed');
+    capsule.removeAttribute('style'); // 若曾用 inline style 顯示/定位
+    capsule.setAttribute('aria-expanded','true');
+    capsule.hidden = true; // 再保險收起
+  }
+
+  // 4) 關閉 GIF 並重置本輪只播一次的旗標（若有）
+  const gif = document.getElementById('invalidGif');
+  if (gif) { gif.classList.remove('show'); gif.hidden = true; }
+  if (typeof invalidGifShownThisLoad !== 'undefined') invalidGifShownThisLoad = false;
+}
+
 function nowTime(){
   const dt = new Date();
   const pad = (n)=> n.toString().padStart(2,"0");
@@ -1316,6 +1339,7 @@ document.getElementById("excelFile").addEventListener("change", async (e)=>{
   const f = e.target.files[0];
   if(!f){ return; }
   CURRENT_FILE_NAME = f.name; // ★ 新增
+  resetErrorUIForNewLoad();  // ★ 換檔 → 先清上一輪錯誤/膠囊/GIF
   setError("");
   hideLoadBtn();           // 換新檔 → 先把載入資料按鈕藏起來
   // 先清空圖片，再清空 chip 欄位（避免先清欄位造成瞬間閃爍）
@@ -1370,6 +1394,8 @@ sheetSelector.addEventListener("change", querySheetInfo);
 async function querySheetInfo(){
   hideDataControls();
   hideLoadBtn();           // 註解：切表當下先把載入按鈕藏起來
+  resetErrorUIForNewLoad();  // ★ 切表 → 先清上一輪（避免舊膠囊掛在畫面上）
+
   if (window.resetOffsets) window.resetOffsets(); // ★ 換新檔案 → OFFSET 歸零（不緩存）
   if (window.resetPinStyle) window.resetPinStyle(); // ★ 切換工作表 → Pin 樣式回預設
   if(!SESSION_ID || !sheetSelector.value) return;
@@ -1461,7 +1487,7 @@ document.getElementById("loadDataBtn").addEventListener("click", async ()=>{
   const _el = getInvalidGifEl();
   if (_el){ _el.classList.remove('show'); _el.hidden = true; }
 
-
+  resetErrorUIForNewLoad();  // ★ 新一輪載入 → 先清上一輪
   setError("");
   const fd = new FormData();
   fd.append("session_id", SESSION_ID);
