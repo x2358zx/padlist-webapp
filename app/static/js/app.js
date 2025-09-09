@@ -285,6 +285,24 @@ const inputsByLabel = new Map(); // label string -> input element
 const labelDivsByLabel = new Map(); // label string -> label element
 const inputsByLabelNorm = new Map();   // 正規化鍵
 
+// === 無法連線 PIN 的 GIF 顯示控制（僅限每次載入後顯示一次） ===
+function getInvalidGifEl(){ return document.getElementById('invalidGif'); }
+let invalidGifShownThisLoad = false;
+
+function showInvalidGifOnce(){
+  const invalidGifEl = getInvalidGifEl();
+  if (invalidGifShownThisLoad || !invalidGifEl) return;
+  invalidGifShownThisLoad = true;
+  invalidGifEl.hidden = false;
+  invalidGifEl.classList.add('show');
+  clearTimeout(invalidGifEl._hideTimer);
+  invalidGifEl._hideTimer = setTimeout(()=>{
+    invalidGifEl.classList.remove('show');
+    invalidGifEl.hidden = true;
+  }, 2200);
+}
+
+
 // ====== Helpers ======
 function setStatus(msg){ statusEl.textContent = msg; }
 function setError(msg){ errorEl.textContent = msg || ""; }
@@ -316,6 +334,9 @@ function setInvalidPins(list){
       if (invalidCountEl)    invalidCountEl.textContent = String(INVALID_PINS.length);
       if (invalidPinsTopEl)  invalidPinsTopEl.textContent = INVALID_PINS.join("\n");
       if (invalidToggleEl)   invalidToggleEl.textContent = "▲"; // 展開中 → 顯示「可收合」
+	  // ★ 新增：若本次載入後第一次遇到無法連線 PIN，播放 GIF 一次
+      if (Array.isArray(INVALID_PINS) && INVALID_PINS.length > 0) {
+        showInvalidGifOnce();
     } else {
       // 沒有無法連線資料 → 完全隱藏
       invalidCapsuleEl.hidden = true;
@@ -324,6 +345,7 @@ function setInvalidPins(list){
 
       if (invalidPinsTopEl) invalidPinsTopEl.textContent = "";
       if (invalidCountEl)   invalidCountEl.textContent = "0";
+      }
     }
   }
 
@@ -1434,7 +1456,12 @@ document.getElementById("loadDataBtn").addEventListener("click", async ()=>{
    setError("本工作表缺少 chip size（寬/高），已略過載入。請先於 Excel 指定儲存格填入 chip size（寬/高）。");
    return;
   }
-  
+  // ★ 每次按「載入資料」前重置：這次載入只播一次
+  invalidGifShownThisLoad = false;
+  const _el = getInvalidGifEl();
+  if (_el){ _el.classList.remove('show'); _el.hidden = true; }
+
+
   setError("");
   const fd = new FormData();
   fd.append("session_id", SESSION_ID);

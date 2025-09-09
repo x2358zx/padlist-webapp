@@ -779,7 +779,29 @@ select:disabled {
   margin-top: 12px; /* ★ 修改：向下微移，創造一個 "掉落" 的感覺 */
 }
 
-/* 60% 複製按鈕 (與一般複製有點區別：青色系) */
+/* excel下載按鈕 (與一般複製有點區別：青色系) */
 #btnExcelApi {
   background: linear-gradient(135deg, #17a2b8, #117a8b);
+}
+/* 讓錯誤膠囊成為定位參考（展開/收合皆適用） */
+#invalidCapsule { position: relative; }
+
+/* GIF 就放在膠囊容器裡：定位在膠囊正下方，水平置中 */
+#invalidCapsule .no-pin-gif{
+  position: absolute;
+  top: calc(100% + 8px);       /* 膠囊底緣往下 8px 的間距 */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2100;               /* 蓋在內容之上，但低於全局更高層 */
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+
+#invalidCapsule .no-pin-gif.show{ opacity: 1; }
+
+#invalidCapsule .no-pin-gif img{
+  width: 180px; height: auto;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.22);
 }
