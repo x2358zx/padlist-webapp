@@ -740,6 +740,11 @@ function buildRingRects(rails){
 function decideRing(side, value, rails){
   if(!rails || !rails[side]) return "unknown";
   const r = rails[side];
+  // ★新增：這個側邊的兩條 rail 要有「足夠間距」才判圈別
+  const TH_SIDE = Math.max(2, pinLineWidth()); // 與 hasTwoRings 同一精神的門檻
+  if (!isFinite(r.inner) || !isFinite(r.outer) || Math.abs(r.inner - r.outer) < TH_SIDE) {
+    return "unknown"; // 單圈或幾乎重疊：不要硬判，避免下邊整排變內圈
+  }
   const mid = (r.inner + r.outer) / 2;
   // 內圈規則：靠中心
   if (side === "left" || side === "top") {
@@ -1075,7 +1080,7 @@ function drawPinsAndLines(){
     const boxEl = inputsByLabel.get(p.pin_no) || inputsByLabelNorm.get(normLabel(p.pin_no));
     const side  = boxEl ? getBoxSide(boxEl) : null;
     let ring    = "unknown";
-    if (rects && side){
+    if (rects && side && hasTwoRings(rails)){
       const axisVal = (side === "left" || side === "right") ? pt.x : pt.y;
       ring = decideRing(side, axisVal, rails);
     }
