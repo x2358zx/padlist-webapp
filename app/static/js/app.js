@@ -1197,6 +1197,24 @@ async function captureStageBlobAtCurrentView(){
   return await canvasToBlob(canvas);
 }
 
+// ★ 只在截圖期間臨時調整點線倍率，截完立即還原
+async function withTempPinScale(scale, task){
+  const prevScale = PIN_STYLE_SCALE;
+  PIN_STYLE_SCALE = scale;
+  if (typeof drawPinsAndLines === 'function') drawPinsAndLines(); // 依新倍率重繪
+  await new Promise(r => requestAnimationFrame(() => r()));       // 等一個 frame
+
+  try {
+    return await task();  // 交給呼叫端執行（通常是 captureStageBlobAtCurrentView）
+  } finally {
+    // 還原
+    PIN_STYLE_SCALE = prevScale;
+    if (typeof drawPinsAndLines === 'function') drawPinsAndLines();
+    await new Promise(r => requestAnimationFrame(() => r()));
+  }
+}
+
+
 // 主要流程：兩次截圖（1:1 與 放大），POST 到 API，拿回 Excel 檔案
 async function downloadExcelViaAPI(){
   try {
@@ -1213,13 +1231,17 @@ async function downloadExcelViaAPI(){
     BIG_VIEW_MODE = false; 
     applyViewMode();                          // 你專案用來套用 BIG_VIEW_MODE 的函式
     await new Promise(r => requestAnimationFrame(()=>r())); // 等畫面更新
-    const leftBlob = await captureStageBlobAtCurrentView();
+    const leftBlob = await withTempPinScale(1.5, async () => {
+      return await captureStageBlobAtCurrentView();
+    });
 
     // 右圖：放大視圖（黃色區 0.9 倍）
     BIG_VIEW_MODE = true; 
     applyViewMode();
     await new Promise(r => requestAnimationFrame(()=>r()));
-    const rightBlob = await captureStageBlobAtCurrentView();
+	const rightBlob = await withTempPinScale(4, async () => {
+      return await captureStageBlobAtCurrentView();
+    });
 
     // 回復原視圖（避免影響使用者）
     BIG_VIEW_MODE = prev; 
