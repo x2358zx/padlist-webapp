@@ -809,3 +809,26 @@ select:disabled {
 /* ★ 當錯誤/一般訊息是空字串時，自動隱藏整列，避免殘影 */
 .status.error:empty,
 .status.normal:empty { display: none; }
+
+/* GIF 定位：膠囊底下（NO.gif）或整個狀態列底下（NICE.gif） */
+#invalidCapsule .no-pin-gif,
+#pageStatusBar > .no-pin-gif{
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+
+
+#pageStatusBar > .no-pin-gif.show{ opacity: 1; }
+
+
+#pageStatusBar > .no-pin-gif img{
+  width: 180px; height: auto;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.22);
+}

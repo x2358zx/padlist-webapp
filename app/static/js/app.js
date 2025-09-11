@@ -288,6 +288,9 @@ const inputsByLabelNorm = new Map();   // 正規化鍵
 // === 無法連線 PIN 的 GIF 顯示控制（僅限每次載入後顯示一次） ===
 function getInvalidGifEl(){ return document.getElementById('invalidGif'); }
 let invalidGifShownThisLoad = false;
+// --- 成功 NICE.gif 控制（只在每次載入流程播一次） ---
+function getOkGifEl(){ return document.getElementById('okGif'); }
+let okGifShownThisLoad = false;
 
 function showInvalidGifOnce(){
   const invalidGifEl = getInvalidGifEl();
@@ -301,7 +304,18 @@ function showInvalidGifOnce(){
     invalidGifEl.hidden = true;
   }, 2200);
 }
-
+function showOkGifOnce(){
+  const ok = getOkGifEl();
+  if (okGifShownThisLoad || !ok) return;
+  okGifShownThisLoad = true;
+  ok.hidden = false;
+  ok.classList.add('show');
+  clearTimeout(ok._hideTimer);
+  ok._hideTimer = setTimeout(()=>{
+    ok.classList.remove('show');
+    ok.hidden = true;
+  }, 2200);
+}
 
 // ====== Helpers ======
 function setStatus(msg){ statusEl.textContent = msg; }
@@ -327,6 +341,10 @@ function resetErrorUIForNewLoad() {
   const gif = document.getElementById('invalidGif');
   if (gif) { gif.classList.remove('show'); gif.hidden = true; }
   if (typeof invalidGifShownThisLoad !== 'undefined') invalidGifShownThisLoad = false;
+  
+  const ok = document.getElementById('okGif');
+  if (ok) { ok.classList.remove('show'); ok.hidden = true; }
+  okGifShownThisLoad = false;
 }
 
 function nowTime(){
@@ -341,42 +359,52 @@ function nowStamp() {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
-document.getElementById("nowtime").textContent = nowTime();
+const nt = document.getElementById("nowtime");
+if (nt) nt.textContent = nowTime();
 
 function setInvalidPins(list){
+  // 1) 標準化陣列
   INVALID_PINS = Array.isArray(list) ? list : [];
 
-  // 頂部「無法連線 PIN」紅色膠囊
+  // 2) 頂部「無法連線 PIN」紅色膠囊
   if (invalidCapsuleEl){
     if (INVALID_PINS.length){
+      // 有資料 → 顯示＋更新統計與內容
       invalidCapsuleEl.hidden = false;
       invalidCapsuleEl.classList.remove('collapsed');
       invalidCapsuleEl.setAttribute('aria-expanded','true');
 
-      if (invalidTopEl)      invalidTopEl.textContent = "無法連線 PIN：";
-      if (invalidCountEl)    invalidCountEl.textContent = String(INVALID_PINS.length);
-      if (invalidPinsTopEl)  invalidPinsTopEl.textContent = INVALID_PINS.join("\n");
-      if (invalidToggleEl)   invalidToggleEl.textContent = "▲"; // 展開中 → 顯示「可收合」
-	  // ★ 新增：若本次載入後第一次遇到無法連線 PIN，播放 GIF 一次
+      if (invalidTopEl)     invalidTopEl.textContent = "無法連線 PIN：";
+      if (invalidCountEl)   invalidCountEl.textContent = String(INVALID_PINS.length);
+      if (invalidPinsTopEl) invalidPinsTopEl.textContent = INVALID_PINS.join("\n");
+      if (invalidToggleEl)  invalidToggleEl.textContent = "▲"; // 展開中 → 顯示可收合
+
+      // 本次載入只播一次的小動畫（若你有 showInvalidGifOnce）
       if (Array.isArray(INVALID_PINS) && INVALID_PINS.length > 0) {
         showInvalidGifOnce();
+      }
     } else {
-      // 沒有無法連線資料 → 完全隱藏
+      // 沒有資料 → 正確的「外層」else：完全隱藏與清空
       invalidCapsuleEl.hidden = true;
       invalidCapsuleEl.classList.remove('collapsed');
       invalidCapsuleEl.setAttribute('aria-expanded','true');
 
       if (invalidPinsTopEl) invalidPinsTopEl.textContent = "";
       if (invalidCountEl)   invalidCountEl.textContent = "0";
+      if (invalidToggleEl)  invalidToggleEl.textContent = "▲"; // 保持一致
+	  
+	  if (Array.isArray(VALID_PINS) && VALID_PINS.length > 0) {
+        showOkGifOnce();
       }
     }
   }
 
-  // 右側 debug（仍保留，預設 hidden）
+  // 3) 右側 debug（預設 hidden）
   if (invalidEl){
     invalidEl.textContent = INVALID_PINS.join("\n");
   }
 }
+
 
 function normLabel(s){
   return String(s || "")
@@ -854,15 +882,52 @@ function chipToStage(x_um, y_um, chipW, chipH){
 }
 
 // ====== Color logic for inputs ======
+// --- 小工具：取出要分類的文字（textContent 為主，value 為輔）
+function getLabelText(el){
+  const t = (el.textContent ?? "").trim();
+  if (t) return t;
+  const v = (el.value ?? "").trim();
+  return v;
+}
+
+// --- 小工具：回傳要套的顏色類別（不含 "bg-" 前綴）
+function classifyInputLabel(val){
+  const U = (val || "").toUpperCase();
+
+  if (!U) return "gray"; // 空字串 → 灰
+
+  // 1) 地 (Ground)
+  const GROUND_KEYS = ["VSS","GND"];
+  if (GROUND_KEYS.some(k => U.includes(k))) return "green";
+
+  // 2) 電源 (Power)
+  const POWER_KEYS = ["VDD","VDP","VCC","VCCIO","VDDIO"];
+  if (POWER_KEYS.some(k => U.includes(k))) return "pink";
+
+  // 3) Q 類（訊號腳 / 資料腳）
+  const OUTPUT_KEYS = ["Q","DQ"];
+  if (OUTPUT_KEYS.some(k => U.includes(k))) return "blue";
+
+  // 4) 其他 → 不上色（或你要回傳 gray 也可以）
+  return null;
+}
+
+// ====== Color logic for inputs ======
 function applyInputColors(){
   inputsByLabel.forEach((el)=>{
-//-   const val = (el.value || "").trim();
-    const val = (el.textContent || "").trim();
+    const val   = getLabelText(el);
+    const color = classifyInputLabel(val);
+
+    // 先清掉舊色
     el.classList.remove("bg-gray","bg-green","bg-pink","bg-blue");
-    if(!val) el.classList.add("bg-gray");
-    else if(val.includes("VSS")) el.classList.add("bg-green");
-    else if(val.includes("VDD") || val.includes("VDP")) el.classList.add("bg-pink");
-    else if(val.toUpperCase().includes("Q")) el.classList.add("bg-blue");
+
+    // 有顏色就上
+    if (color) {
+      el.classList.add(`bg-${color}`);
+    } else {
+      // 你想保留「未知就灰色」邏輯的話，改成：
+      // el.classList.add("bg-gray");
+    }
   });
 }
 
@@ -989,17 +1054,21 @@ function segIntersect(A,B){
   return false;
 }
 
+// === 線段交叉檢測（有交叉就套用同樣的 .conflict 高亮） ===
 function checkLineIntersections(){
   const lines = getOverlayLines(); // {x1,y1,x2,y2, el, tag}
-  // 依 data-ring 分組，只在同組內檢查交叉
+
+  // 依 data-ring 分組
   const groups = { inner: [], outer: [], unknown: [] };
   lines.forEach(L => {
     const ring = L.el.dataset.ring || "unknown";
     (groups[ring] || groups.unknown).push(L);
   });
+
+  // 小工具：兩兩檢查是否相交
   const scan = (arr)=>{
-    for(let i=0;i<arr.length;i++){
-      for(let j=i+1;j<arr.length;j++){
+    for (let i = 0; i < arr.length; i++){
+      for (let j = i + 1; j < arr.length; j++){
         if (segIntersect(arr[i], arr[j])){
           arr[i].el.classList.add('conflict');
           arr[j].el.classList.add('conflict');
@@ -1007,10 +1076,22 @@ function checkLineIntersections(){
       }
     }
   };
-  scan(groups.inner);
-  scan(groups.outer);
-  // unknown 跟任何圈不互檢，避免誤爆
+
+  // 若畫面上「沒有任何 inner/outer」→ 代表單圈（或未能分圈）
+  // 單圈時就把全部線一起掃（含 unknown）
+  const hasKnownRings = (groups.inner.length + groups.outer.length) > 0;
+  if (hasKnownRings) {
+    // 雙圈：各圈內部分開檢查，避免跨圈誤判
+    scan(groups.inner);
+    scan(groups.outer);
+    // unknown 不與任何圈互檢
+  } else {
+    // 單圈：全部一起檢查
+    scan(lines);
+  }
 }
+
+
 
 
 // 將衝突的兩條線加上 .conflict（以 data-tag 選取）
