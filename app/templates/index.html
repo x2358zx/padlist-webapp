@@ -1,56 +1,53 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PAD List Web</title>
-  <link rel="icon" href="/static/app.ico"/>
-  <link rel="stylesheet" href="/static/css/style.css"/>
+  <link rel="icon" href="/static/app.ico" />
+  <link rel="stylesheet" href="/static/css/style.css" />
 </head>
+
 <body>
   <div class="container">
     <header>
       <div class="title">PAD List WEB</div>
       <a href="https://p.ecpay.com.tw/6059C83" target="_blank" rel="noopener noreferrer" class="version-link">
-        <div class="version-badge"
-		     data-tooltip="PAD List WEB V1.3.5 : 2025/09/11&#xa;若您覺得不錯，可以點擊此處斗內作者!">
+        <div class="version-badge" data-tooltip="PAD List WEB V1.4.0 : 2025/12/29&#xa;若您覺得不錯，可以點擊此處斗內作者!">
           <span class="icon">🤝</span>
           <span>Version 1.3.5</span>
         </div>
-      </a>	  
+      </a>
     </header>
-	
-	<!-- 頁面狀態列（不在截圖區） -->
-	<div id="pageStatusBar" class="status-bar" data-html2canvas-ignore="true">
-	  <div id="status" class="status normal" role="status" aria-live="polite">
-		等待選擇檔案...
-	  </div>
-	  <div id="error" class="status error" role="alert" aria-live="assertive"></div>
-	  <!-- 無法連線 PIN 的頂部紅色膠囊（預設隱藏；有資料才顯示） -->
-	  <div id="invalidCapsule"
-	  	   class="status danger invalid-capsule"
-	  	   role="region"
-	  	   aria-live="polite"
-	  	   aria-expanded="true"
-	  	   hidden>
-	      <div class="capsule-row">
-	  	  <span id="invalidTop" class="title">無法連線 PIN：<b id="invalidCount">0</b> 筆</span>
-	  	  <button id="invalidToggle" class="toggle" type="button" aria-label="收合">▲</button>
-	      </div>
-	      <pre id="invalidPinsTop" class="details"></pre>
-		  <!-- ✅ 移到錯誤膠囊內：之後用 CSS 絕對定位在膠囊正下方 -->
-		  <div id="invalidGif" class="no-pin-gif" hidden data-html2canvas-ignore="true" aria-hidden="true">
-			<img src="/static/img/NO.gif" alt="無法連線 PIN">
-		  </div>
-	  </div>
-	  
-	  <!-- ✅ 全部連線正常時的 GIF（與 NO.gif 共用樣式/位置） -->
-	  <div id="okGif" class="no-pin-gif" hidden data-html2canvas-ignore="true" aria-hidden="true">
-		<img src="/static/img/NICE.gif" alt="全部連線正常">
-	  </div>
-	  
-	</div>
-	
+
+    <!-- 頁面狀態列（不在截圖區） -->
+    <div id="pageStatusBar" class="status-bar" data-html2canvas-ignore="true">
+      <div id="status" class="status normal" role="status" aria-live="polite">
+        等待選擇檔案...
+      </div>
+      <div id="error" class="status error" role="alert" aria-live="assertive"></div>
+      <!-- 無法連線 PIN 的頂部紅色膠囊（預設隱藏；有資料才顯示） -->
+      <div id="invalidCapsule" class="status danger invalid-capsule" role="region" aria-live="polite"
+        aria-expanded="true" hidden>
+        <div class="capsule-row">
+          <span id="invalidTop" class="title">無法連線 PIN：<b id="invalidCount">0</b> 筆</span>
+          <button id="invalidToggle" class="toggle" type="button" aria-label="收合">▲</button>
+        </div>
+        <pre id="invalidPinsTop" class="details"></pre>
+        <!-- ✅ 移到錯誤膠囊內：之後用 CSS 絕對定位在膠囊正下方 -->
+        <div id="invalidGif" class="no-pin-gif" hidden data-html2canvas-ignore="true" aria-hidden="true">
+          <img src="/static/img/NO.gif" alt="無法連線 PIN">
+        </div>
+      </div>
+
+      <!-- ✅ 全部連線正常時的 GIF（與 NO.gif 共用樣式/位置） -->
+      <div id="okGif" class="no-pin-gif" hidden data-html2canvas-ignore="true" aria-hidden="true">
+        <img src="/static/img/NICE.gif" alt="全部連線正常">
+      </div>
+
+    </div>
+
     <main>
       <section class="left-pane">
 
@@ -77,7 +74,7 @@
               <input id="chipHeight" type="text" readonly />
             </div>
           </div>
-		  
+
           <div class="row">
             <button id="loadDataBtn">2. 載入資料</button>
           </div>
@@ -87,163 +84,198 @@
         <div class="section" hidden>
           <div class="section-title">欄位設定（已改為自動偵測）</div>
           <div class="grid-2">
-            <label>Chip Size 儲存格：</label><input id="chipCell" type="text" value="C3"/>
-            <label>Project Code 儲存格：</label><input id="projectCell" type="text" value="C2"/>
-            <label>Pin編號欄位：</label><input id="pinNoCol" type="text" value="B"/>
-            <label>Pin名稱欄位：</label><input id="pinNameCol" type="text" value="C"/>
-            <label>X座標欄位：</label><input id="xCol" type="text" value="D"/>
-            <label>Y座標欄位：</label><input id="yCol" type="text" value="E"/>
-            <label>資料起始行：</label><input id="startRow" type="number" value="8"/>
+            <label>Chip Size 儲存格：</label><input id="chipCell" type="text" value="C3" />
+            <label>Project Code 儲存格：</label><input id="projectCell" type="text" value="C2" />
+            <label>Pin編號欄位：</label><input id="pinNoCol" type="text" value="B" />
+            <label>Pin名稱欄位：</label><input id="pinNameCol" type="text" value="C" />
+            <label>X座標欄位：</label><input id="xCol" type="text" value="D" />
+            <label>Y座標欄位：</label><input id="yCol" type="text" value="E" />
+            <label>資料起始行：</label><input id="startRow" type="number" value="8" />
           </div>
         </div>
 
-<div id="dataControls" hidden>
-        <div class="coord-controls">
-		<!--
+        <div id="dataControls" hidden>
+          <div class="coord-controls">
+            <!--
           <button id="btnMin">3. 選擇MIN點(左下)</button>
           <button id="btnMax">4. 選擇MAX點(右上)</button>
           <button id="btnReset">重置座標</button>
 		  -->
 
-          <div class="row zoom-row">
-		    <ul>
-              <li>縮放(ctrl+滾輪)：<span id="zoomVal">100%</span></li>
-			  <li>滾輪中鍵按著可以抓住並且移動</li>
-			</ul>
-          </div>
-        </div>
-		
-		<fieldset class="group capsule-block">
-          <legend class="capsule-legend">點線樣式（Pins）</legend>
-        
-          <!-- 點線大小倍率 -->
-          <label class="row">
-            <span>點線大小</span>
-            <select id="pinStyleScale">
-              <option value="1.5" selected>1.5×（預設）</option>
-              <option value="2.5">2.5×</option>
-              <option value="4">4×</option>
-            </select>
-          </label>
-        
-          <!-- 點線顏色（三選一） -->
-          <div class="row">
-            <span>顏色</span>
-            <div class="radio-chip-palette" id="pinStyleColorGroup">
-              <label class="radio-chip">
-                <input type="radio" name="pinStyleColor" value="#BEBEBE" checked>
-                <span class="swatch" style="--c:#BEBEBE"></span>灰（預設）
-              </label>
-              <label class="radio-chip">
-                <input type="radio" name="pinStyleColor" value="#00EC00">
-                <span class="swatch" style="--c:#00EC00"></span>綠
-              </label>
-              <label class="radio-chip">
-                <input type="radio" name="pinStyleColor" value="#00CACA">
-                <span class="swatch" style="--c:#00CACA"></span>藍綠
-              </label>
+            <div class="row zoom-row">
+              <ul>
+                <li>縮放(ctrl+滾輪)：<span id="zoomVal">100%</span></li>
+                <li>滾輪中鍵按著可以抓住並且移動</li>
+              </ul>
             </div>
           </div>
-		  
-		  <!-- 顯示線（全部 / 內圈 / 外圈） -->
-          <label class="row">
-            <span>顯示線</span>
-            <select id="pinLineScope">
-              <option value="all" selected>全部（預設）</option>
-              <option value="inner">內圈</option>
-              <option value="outer">外圈</option>
-            </select>
-          </label>
 
-		  
-        </fieldset>
+          <fieldset class="group capsule-block">
+            <legend class="capsule-legend">點線樣式（Pins）</legend>
 
-		
-	    <fieldset class="group capsule-block">
-          <legend class="capsule-legend">邊界內縮（MIN/MAX OFFSET）</legend>
-        
-          <label class="row">
-            <span>四邊連動 (shift+滾輪可以控制)</span>
-            <input id="offsetLink" type="checkbox" checked>
-          </label>
-        
-          <label class="row">
-            <span>內縮(px)</span>
-            <input id="offsetAll" type="range" min="0" max="30" step="1" value="0" class="range">
-            <span id="offsetAllValue" class="value-badge">0</span>
-          </label>
-        
-          <div id="offsetGrid" class="offset-grid" style="display:none">
-            <label>
-              <span>上</span>
-              <input id="offsetTop" type="range" min="0" max="30" step="1" value="0" class="range">
-              <span id="offsetTopValue" class="value-badge">0</span>
+            <!-- 點線大小倍率 -->
+            <label class="row">
+              <span>點線大小</span>
+              <select id="pinStyleScale">
+                <option value="1.5" selected>1.5×（預設）</option>
+                <option value="2.5">2.5×</option>
+                <option value="4">4×</option>
+              </select>
             </label>
-            <label>
-              <span>右</span>
-              <input id="offsetRight" type="range" min="0" max="30" step="1" value="0" class="range">
-              <span id="offsetRightValue" class="value-badge">0</span>
+
+            <!-- 點線顏色（三選一） -->
+            <div class="row">
+              <span>顏色</span>
+              <!-- 加入 style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;" 確保橫排不跑版 -->
+              <div class="radio-chip-palette" id="pinStyleColorGroup"
+                style="display:flex; flex-wrap:wrap; gap:8px; align-items:center;">
+                <label class="radio-chip">
+                  <input type="radio" name="pinStyleColor" value="#BEBEBE" checked>
+                  <span class="swatch" style="--c:#BEBEBE"></span>灰（預設）
+                </label>
+                <label class="radio-chip">
+                  <input type="radio" name="pinStyleColor" value="#00EC00">
+                  <span class="swatch" style="--c:#00EC00"></span>綠
+                </label>
+                <label class="radio-chip">
+                  <input type="radio" name="pinStyleColor" value="#00CACA">
+                  <span class="swatch" style="--c:#00CACA"></span>藍綠
+                </label>
+
+                <!-- 新增：自訂顏色 -->
+                <!-- 直接將 label 設為 relative，彈出層放裡面 -->
+                <label class="radio-chip custom-chip"
+                  style="position:relative; display:inline-flex; align-items:center;">
+                  <input type="radio" name="pinStyleColor" value="custom">
+                  <!-- 移除問號，保留虛線框 -->
+                  <span class="swatch" style="background:none; border:1px dashed #999;"></span>自訂
+
+                  <!-- 自訂顏色的細項控制，定位於 label 下方 -->
+                  <div id="customColorControls" class="custom-controls"
+                    style="display:none; position:absolute; left:0; top:calc(100% + 4px); z-index:100; background:#fff; border:1px solid #ccc; padding:6px 10px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); gap: 10px; align-items: center; white-space:nowrap; cursor:default;">
+                    <!-- 小箭頭 -->
+                    <div
+                      style="position: absolute; top: -6px; left: 15px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 6px solid #ccc;">
+                    </div>
+                    <div
+                      style="position: absolute; top: -5px; left: 15px; width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 6px solid #fff;">
+                    </div>
+
+                    <!-- 避免點擊 color input 觸發 radio change -->
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <label style="display:flex; align-items:center; gap:4px; font-size:0.9em; cursor:text;">
+                        外圈: <input type="color" id="customColorOuter" value="#FF0000"
+                          style="width:30px; height:24px; padding:0; border:none;">
+                      </label>
+                      <label style="display:flex; align-items:center; gap:4px; font-size:0.9em; cursor:text;">
+                        內圈: <input type="color" id="customColorInner" value="#0000FF"
+                          style="width:30px; height:24px; padding:0; border:none;">
+                      </label>
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <!-- 顯示線（全部 / 內圈 / 外圈） -->
+            <label class="row">
+              <span>顯示線</span>
+              <select id="pinLineScope">
+                <option value="all" selected>全部（預設）</option>
+                <option value="inner">內圈</option>
+                <option value="outer">外圈</option>
+              </select>
             </label>
-            <label>
-              <span>下</span>
-              <input id="offsetBottom" type="range" min="0" max="30" step="1" value="0" class="range">
-              <span id="offsetBottomValue" class="value-badge">0</span>
+
+
+          </fieldset>
+
+
+          <fieldset class="group capsule-block">
+            <legend class="capsule-legend">邊界內縮（MIN/MAX OFFSET）</legend>
+
+            <label class="row">
+              <span>四邊連動 (shift+滾輪可以控制)</span>
+              <input id="offsetLink" type="checkbox" checked>
             </label>
-            <label>
-              <span>左</span>
-              <input id="offsetLeft" type="range" min="0" max="30" step="1" value="0" class="range">
-              <span id="offsetLeftValue" class="value-badge">0</span>
+
+            <label class="row">
+              <span>內縮(px)</span>
+              <input id="offsetAll" type="range" min="0" max="30" step="1" value="0" class="range">
+              <span id="offsetAllValue" class="value-badge">0</span>
             </label>
-          </div>
-        
-          <div class="row end">
-            <button id="offsetReset" type="button">重設</button>
-          </div>
-        </fieldset>
-</div>
+
+            <div id="offsetGrid" class="offset-grid" style="display:none">
+              <label>
+                <span>上</span>
+                <input id="offsetTop" type="range" min="0" max="30" step="1" value="0" class="range">
+                <span id="offsetTopValue" class="value-badge">0</span>
+              </label>
+              <label>
+                <span>右</span>
+                <input id="offsetRight" type="range" min="0" max="30" step="1" value="0" class="range">
+                <span id="offsetRightValue" class="value-badge">0</span>
+              </label>
+              <label>
+                <span>下</span>
+                <input id="offsetBottom" type="range" min="0" max="30" step="1" value="0" class="range">
+                <span id="offsetBottomValue" class="value-badge">0</span>
+              </label>
+              <label>
+                <span>左</span>
+                <input id="offsetLeft" type="range" min="0" max="30" step="1" value="0" class="range">
+                <span id="offsetLeftValue" class="value-badge">0</span>
+              </label>
+            </div>
+
+            <div class="row end">
+              <button id="offsetReset" type="button">重設</button>
+            </div>
+          </fieldset>
+        </div>
 
         <!-- 取代原本的 notice UL：手風琴（可同時全關，但不可同時全開） -->
-<div class="notice">
-  <div class="section-title">注意事項</div>
+        <div class="notice">
+          <div class="section-title">注意事項</div>
 
-  <div class="accordion" id="noticesAcc" role="tablist" aria-multiselectable="false">
-    <!-- 操作注意 -->
-    <div class="acc-item">
-      <button class="acc-header" data-key="operation" aria-expanded="false" type="button">
-        操作注意
-      </button>
-      <div class="acc-panel" hidden>
-        <!-- 用 <pre> 保留換行、避免 contenteditable 產生雜 tag -->
-        <pre id="notice-op" class="acc-content" data-key="operation"></pre>
+          <div class="accordion" id="noticesAcc" role="tablist" aria-multiselectable="false">
+            <!-- 操作注意 -->
+            <div class="acc-item">
+              <button class="acc-header" data-key="operation" aria-expanded="false" type="button">
+                操作注意
+              </button>
+              <div class="acc-panel" hidden>
+                <!-- 用 <pre> 保留換行、避免 contenteditable 產生雜 tag -->
+                <pre id="notice-op" class="acc-content" data-key="operation"></pre>
 
-        <!-- 僅主管可見 -->
-        <div class="acc-actions" hidden data-key="operation">
-          <button class="acc-edit"   type="button">編輯</button>
-          <button class="acc-save"   type="button" hidden>儲存</button>
-          <button class="acc-cancel" type="button" hidden>取消</button>
+                <!-- 僅主管可見 -->
+                <div class="acc-actions" hidden data-key="operation">
+                  <button class="acc-edit" type="button">編輯</button>
+                  <button class="acc-save" type="button" hidden>儲存</button>
+                  <button class="acc-cancel" type="button" hidden>取消</button>
+                </div>
+                <textarea class="acc-editor" hidden></textarea>
+              </div>
+            </div>
+
+            <!-- bonding 注意 -->
+            <div class="acc-item">
+              <button class="acc-header" data-key="bonding" aria-expanded="false" type="button">
+                bonding 注意
+              </button>
+              <div class="acc-panel" hidden>
+                <pre id="notice-bond" class="acc-content" data-key="bonding"></pre>
+
+                <div class="acc-actions" hidden data-key="bonding">
+                  <button class="acc-edit" type="button">編輯</button>
+                  <button class="acc-save" type="button" hidden>儲存</button>
+                  <button class="acc-cancel" type="button" hidden>取消</button>
+                </div>
+                <textarea class="acc-editor" hidden></textarea>
+              </div>
+            </div>
+          </div>
         </div>
-        <textarea class="acc-editor" hidden></textarea>
-      </div>
-    </div>
-
-    <!-- bonding 注意 -->
-    <div class="acc-item">
-      <button class="acc-header" data-key="bonding" aria-expanded="false" type="button">
-        bonding 注意
-      </button>
-      <div class="acc-panel" hidden>
-        <pre id="notice-bond" class="acc-content" data-key="bonding"></pre>
-
-        <div class="acc-actions" hidden data-key="bonding">
-          <button class="acc-edit"   type="button">編輯</button>
-          <button class="acc-save"   type="button" hidden>儲存</button>
-          <button class="acc-cancel" type="button" hidden>取消</button>
-        </div>
-        <textarea class="acc-editor" hidden></textarea>
-      </div>
-    </div>
-  </div>
-</div>
 
 
       </section>
@@ -254,28 +286,28 @@
           <div id="stage" class="stage" style="width:780px;height:1000px;">
             <img id="chipImage" class="chip-image" alt="chip" />
             <svg id="overlay" class="overlay" width="780" height="1000"></svg>
-			
-			<!-- ★ 新增：PadWindow / CUP 膠囊（與 Project Code 膠囊同樣風格） -->
-			<div class="stage-hud meta-hud">
-			  <div class="hud-item"><span>PadWindow：</span><b id="padwindow"></b></div>
-			  <div class="hud-item"><span>CUP：</span><b id="cup"></b></div>
-			</div>
 
-			<!-- 新增：畫布 HUD（左：Project Code；右：時間） -->
-			<div class="stage-hud">
-			  <div class="hud-item project-code"><span>Project Code：</span><b id="projectCode"></b></div>
-			  <div class="hud-item nowtime" id="nowtime"></div>
-			</div>
-			<div id="epadBackground">EPAD</div>
-			<!-- 文字框與標籤會動態插入 -->
+            <!-- ★ 新增：PadWindow / CUP 膠囊（與 Project Code 膠囊同樣風格） -->
+            <div class="stage-hud meta-hud">
+              <div class="hud-item"><span>PadWindow：</span><b id="padwindow"></b></div>
+              <div class="hud-item"><span>CUP：</span><b id="cup"></b></div>
+            </div>
+
+            <!-- 新增：畫布 HUD（左：Project Code；右：時間） -->
+            <div class="stage-hud">
+              <div class="hud-item project-code"><span>Project Code：</span><b id="projectCode"></b></div>
+              <div class="hud-item nowtime" id="nowtime"></div>
+            </div>
+            <div id="epadBackground">EPAD</div>
+            <!-- 文字框與標籤會動態插入 -->
           </div>
         </div>
 
         <div class="actions">
           <button id="btnDownload">下載 PNG 截圖</button>
-		  <button id="btnCopy">📋 複製截圖</button>
-		  <button id="btnViewToggle">放大視圖</button>
-		  <button id="btnExcelApi">Excel 下載(含2張圖)</button>
+          <button id="btnCopy">📋 複製截圖</button>
+          <button id="btnViewToggle">放大視圖</button>
+          <button id="btnExcelApi">Excel 下載(含2張圖)</button>
 
         </div>
 
@@ -289,6 +321,7 @@
 
   <script src="/static/js/html2canvas.min.js"></script> <!--先載入依賴檔-->
   <script src="/static/js/app.js"></script>
-  
+
 </body>
+
 </html>
