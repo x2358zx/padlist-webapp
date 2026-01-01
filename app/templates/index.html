@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>PAD List Web</title>
   <link rel="icon" href="/static/app.ico" />
-  <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="stylesheet" href="/static/css/style.css?v=7" /> <!-- 2026/1/1修改:版號更新 -->
 </head>
 
 <body>
@@ -77,6 +77,10 @@
 
           <div class="row">
             <button id="loadDataBtn">2. 載入資料</button>
+          </div>
+          <div class="row">
+            <!-- 2026/1/1修改:預設hidden -->
+            <button id="openRulesBtn" class="btn-secondary" hidden>⚙️ 規則設定</button>
           </div>
         </div>
 
@@ -319,8 +323,49 @@
     </main>
   </div>
 
+  <div id="rulesModal" class="modal" hidden>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>驗證規則設定 (Validation Rules)</h2>
+        <button id="closeRulesBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+
+        <!-- Tab 切換 -->
+        <div class="tabs">
+          <button class="tab-btn active" data-tab="tab-rules">自定義規則</button>
+          <button class="tab-btn" data-tab="tab-forbidden">禁止腳位</button>
+        </div>
+
+        <!-- 規則列表 -->
+        <div id="tab-rules" class="tab-panel active">
+          <div class="rules-toolbar">
+            <button id="addRuleBtn" class="btn-sm">Refesh/Add New Rule</button>
+            <span class="tip">提示：允許模式支援 Regex (如 <code>^VDDP$</code> 或 <code>^Q[0-7]$</code>)</span>
+          </div>
+          <div id="rulesContainer" class="rules-list">
+            <!-- 動態生成規則卡片 -->
+          </div>
+        </div>
+
+        <!-- 禁止腳位設定 -->
+        <div id="tab-forbidden" class="tab-panel">
+          <div class="form-group">
+            <label>禁止使用的腳位 (逗號分隔)：</label>
+            <textarea id="forbiddenPinsInput" rows="5" placeholder="例如: 5, 8, 12..."></textarea>
+            <p class="tip">這些腳位一旦出現，將直接顯示亮紅色警告。</p>
+          </div>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button id="saveRulesBtn" class="btn-primary">儲存並套用</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/static/js/html2canvas.min.js"></script> <!--先載入依賴檔-->
-  <script src="/static/js/app.js"></script>
+  <script src="/static/js/app.js?v=7"></script> <!-- 2026/1/1修改:版號更新 -->
 
 </body>
 

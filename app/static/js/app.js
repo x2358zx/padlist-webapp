@@ -103,6 +103,10 @@ async function checkEditor() {
       el.hidden = !IS_EDITOR;
     });
 
+    // ★ 規則設定按鈕：有權限才顯示 (2026/1/1修改)
+    const rulesBtn = document.getElementById("openRulesBtn");
+    if (rulesBtn) rulesBtn.hidden = !IS_EDITOR;
+
   } catch (err) {
     console.warn("[checkEditor] failed:", err);
     IS_EDITOR = false; // 安全預設
@@ -282,6 +286,24 @@ let MAX_POINT = null; // {x,y}
 let VALID_PINS = []; // {pin_no, pin_name, x, y}
 let INVALID_PINS = [];
 let CURRENT_SHEET_REQ = 0; // === Sheet 切換請求序號：只採用最後一次回應，避免瞬閃 ===
+
+// === Dynamic Validation Rules ===
+let VALIDATION_RULES = [];
+let FORBIDDEN_PINS = [];
+
+async function loadRules() {
+  try {
+    const r = await fetch("/api/rules", { cache: "no-store" });
+    if (r.ok) {
+      const data = await r.json();
+      VALIDATION_RULES = data.rules || [];
+      FORBIDDEN_PINS = data.forbidden_pins || [];
+      // console.log("Rules loaded:", VALIDATION_RULES.length, "Forbidden:", FORBIDDEN_PINS.length);
+    }
+  } catch (e) {
+    console.warn("Failed to load rules:", e);
+  }
+}
 
 const inputsByLabel = new Map(); // label string -> input element
 const labelDivsByLabel = new Map(); // label string -> label element
@@ -918,29 +940,79 @@ function classifyInputLabel(val) {
   const POWER_KEYS = ["VDD", "VDP", "VCC", "VCCIO", "VDDIO"];
   if (POWER_KEYS.some(k => U.includes(k))) return "pink";
 
-  // 3) Q 類（訊號腳 / 資料腳）
-  const OUTPUT_KEYS = ["Q", "DQ"];
-  if (OUTPUT_KEYS.some(k => U.includes(k))) return "blue";
+  // 3) Q 類（訊號腳 / 資料腳）-> 已移除，統一由 Rule Editor (validation_rules.json) 控制 (2026/1/1修改)
+  // if (/^Q[0-7]$/.test(U)) return "blue";
 
-  // 4) 其他 → 不上色（或你要回傳 gray 也可以）
+  // 4) 其他 → 不上色
   return null;
 }
 
 // ====== Color logic for inputs ======
 function applyInputColors() {
-  inputsByLabel.forEach((el) => {
+  // 動態驗證邏輯
+  inputsByLabel.forEach((el, keyLabel) => {
     const val = getLabelText(el);
-    const color = classifyInputLabel(val);
+    const U = (val || "").toUpperCase();
+    const kStr = String(keyLabel).trim();
 
-    // 先清掉舊色
-    el.classList.remove("bg-gray", "bg-green", "bg-pink", "bg-blue");
+    // 1. 預設顏色 (通用)
+    let color = classifyInputLabel(val);
+    let matchedRule = false;
 
-    // 有顏色就上
-    if (color) {
+    // 2. 禁止腳位檢查 (優先度最高) - 只有當「有輸入值」且在禁止清單中時才亮紅
+    // 若該腳位為空，則不亮紅
+    if (FORBIDDEN_PINS.map(String).includes(kStr) && val) {
+      color = "red-alert";
+      matchedRule = true;
+    }
+
+    // 3. 自定義規則 (遍歷)
+    if (!matchedRule) {
+      for (const rule of VALIDATION_RULES) {
+        // rule.pins 包含此腳位嗎？
+        if (rule.pins && rule.pins.includes(kStr)) {
+          matchedRule = true;
+          // 檢查是否符合 allowed_patterns
+          // allowed_patterns 是一組 Regex 字串或純文字
+          let isMatch = false;
+          if (rule.allowed_patterns && rule.allowed_patterns.length > 0) {
+            isMatch = rule.allowed_patterns.some(pat => {
+              try {
+                return new RegExp(pat).test(U);
+              } catch (e) {
+                return pat === U; // Fallback to exact match
+              }
+            });
+          }
+
+          if (isMatch) {
+            color = rule.color; // Pass (Pink/Blue/Green)
+          } else {
+            color = "red-alert"; // Fail
+          }
+
+          break; // 找到第一個匹配的腳位規則就停 (通常一個腳位只屬一個群組)
+        }
+      }
+    }
+
+    // 4. 若無特定規則，使用 classifyInputLabel 的結果 (前面已賦值)
+    // 或是舊有的硬規則 (如果需要保留相容性，可在此追加)
+
+    // 清掉舊色
+    el.classList.remove("bg-gray", "bg-green", "bg-pink", "bg-blue", "bg-red-alert");
+    el.style.backgroundColor = "";
+    el.style.color = "";
+    el.style.fontWeight = "";
+
+    // 套用顏色
+    if (color === "red-alert") {
+      el.style.backgroundColor = "#FF0000";
+      el.style.color = "#FFFFFF";
+      el.style.fontWeight = "bold";
+      el.classList.add("bg-red-alert");
+    } else if (color) {
       el.classList.add(`bg-${color}`);
-    } else {
-      // 你想保留「未知就灰色」邏輯的話，改成：
-      // el.classList.add("bg-gray");
     }
   });
 }
@@ -1958,6 +2030,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 
   // init
+  loadRules(); // ★ 預載規則
+  checkEditor();
   loadOffset();
   syncUI();
   // 首次載入就套用一次（若你要等圖片載好再套，可以把這行移到 onload 後）
@@ -2033,3 +2107,180 @@ invalidToggleEl?.addEventListener("click", () => {
 
 // Initial side UI
 buildSideUI();
+
+// === Rule Editor UI Logic ===
+function setupRuleEditor() {
+  const modal = document.getElementById('rulesModal');
+  const btnOpen = document.getElementById('openRulesBtn');
+  const btnClose = document.getElementById('closeRulesBtn');
+  const btnSave = document.getElementById('saveRulesBtn');
+  const btnAdd = document.getElementById('addRuleBtn');
+  const rulesContainer = document.getElementById('rulesContainer');
+  const forbiddenInput = document.getElementById('forbiddenPinsInput');
+  const tabs = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+
+  if (!modal || !btnOpen) return;
+
+  // 1. 開啟 Modal
+  btnOpen.addEventListener('click', async () => {
+    console.log("BtnOpen clicked");
+    try {
+      console.log("Loading rules...");
+      await loadRules();
+      console.log("Rules loaded. Rendering UI...");
+      renderRulesUI();
+      console.log("UI Rendered. Showing modal...");
+      modal.hidden = false;
+      // Force reflow
+      void modal.offsetWidth;
+      modal.style.opacity = '1';
+      console.log("Modal shown.");
+    } catch (err) {
+      console.error("Error opening modal:", err);
+      alert("Error: " + err);
+    }
+  });
+
+  // 2. 關閉 Modal
+  const close = () => {
+    modal.style.opacity = 0;
+    setTimeout(() => { modal.hidden = true; }, 300);
+  };
+  btnClose.addEventListener('click', close);
+
+  // 3. Tab 切換
+  tabs.forEach(t => {
+    t.addEventListener('click', () => {
+      tabs.forEach(x => x.classList.remove('active'));
+      panels.forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      document.getElementById(t.dataset.tab).classList.add('active');
+    });
+  });
+
+  // 4. Render UI
+  function renderRulesUI() {
+    forbiddenInput.value = FORBIDDEN_PINS.join(", ");
+    rulesContainer.innerHTML = '';
+
+    VALIDATION_RULES.forEach((rule, idx) => {
+      const card = document.createElement('div');
+      card.className = 'rule-card';
+
+      const patStr = rule.allowed_patterns ? rule.allowed_patterns.join(", ") : "";
+      const pinsStr = rule.pins ? rule.pins.join(", ") : "";
+
+      card.innerHTML = `
+        <div class="rule-header">
+           <div class="rule-title">
+             <span class="badge ${rule.color}">${rule.description || 'Custom Rule'}</span>
+           </div>
+           <div class="rule-controls">
+             <button class="btn-sm btn-delete" data-idx="${idx}">刪除</button>
+           </div>
+        </div>
+        <div class="grid-2" style="grid-template-columns: 1fr 2fr;">
+           <label>群組描述</label>
+           <input type="text" class="rule-desc" value="${rule.description || ''}" placeholder="例如: VDD Check">
+           
+           <label>顏色</label>
+           <select class="rule-color">
+             <option value="pink" ${rule.color === 'pink' ? 'selected' : ''}>粉紅 (Power)</option>
+             <option value="green" ${rule.color === 'green' ? 'selected' : ''}>綠色 (Ground)</option>
+             <option value="blue" ${rule.color === 'blue' ? 'selected' : ''}>藍色 (Signal)</option>
+           </select>
+
+           <label>適用腳位 (逗號分隔)</label>
+           <input type="text" class="rule-pins" value="${pinsStr}" placeholder="例如: 87, 92">
+
+           <label>允許模式 (Regex)</label>
+           <input type="text" class="rule-pats" value="${patStr}" placeholder="例如: ^VDDP$">
+        </div>
+      `;
+      rulesContainer.appendChild(card);
+    });
+
+    // 綁定刪除按鈕
+    cardDeleteBind();
+  }
+
+  function cardDeleteBind() {
+    document.querySelectorAll('.btn-delete').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = e.target.dataset.idx;
+        VALIDATION_RULES.splice(idx, 1);
+        renderRulesUI();
+      });
+    });
+  }
+
+  // 5. Add New Rule
+  btnAdd.addEventListener('click', () => {
+    VALIDATION_RULES.unshift({
+      id: "new_rule_" + Date.now(),
+      pins: [],
+      allowed_patterns: [],
+      color: "blue",
+      description: "New Rule"
+    });
+    renderRulesUI();
+  });
+
+  // 6. Save
+  btnSave.addEventListener('click', async () => {
+    // Collect Data
+    const newRules = [];
+    document.querySelectorAll('.rule-card').forEach(card => {
+      const desc = card.querySelector('.rule-desc').value.trim();
+      const color = card.querySelector('.rule-color').value;
+      const pinsRaw = card.querySelector('.rule-pins').value;
+      const patsRaw = card.querySelector('.rule-pats').value;
+
+      const pins = pinsRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+      const pats = patsRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+
+      newRules.push({
+        id: "rule_" + Math.random().toString(36).substr(2, 9),
+        pins: pins,
+        allowed_patterns: pats,
+        color: color,
+        description: desc
+      });
+    });
+
+    const fbRaw = forbiddenInput.value;
+    const fb = fbRaw.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+
+    const payload = {
+      rules: newRules,
+      forbidden_pins: fb
+    };
+
+    try {
+      const r = await fetch("/api/rules", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (r.ok) {
+        alert("規則除存成功！");
+        VALIDATION_RULES = newRules;
+        FORBIDDEN_PINS = fb;
+        close();
+        // 若已有載入資料，重新套用顏色
+        applyInputColors();
+      } else {
+        alert("儲存失敗");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("儲存錯誤: " + e);
+    }
+  });
+}
+
+// 啟動編輯器邏輯
+document.addEventListener("DOMContentLoaded", () => {
+  setupRuleEditor();
+});

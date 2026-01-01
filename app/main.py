@@ -2,6 +2,7 @@ import os
 import io
 import uuid
 import zipfile
+import platform  # ★ 新增：取得本機 Hostname (2026/1/1修改)
 from typing import List, Optional, Dict, Any
 
 from fastapi import FastAPI, Request, UploadFile, File, Form
@@ -40,10 +41,13 @@ templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 
 # === 身分/環境設定（以環境變數為主） ===
 TRUST_PROXY = os.getenv("TRUST_PROXY", "1") == "1"
-DEPLOY_ENV = os.getenv("DEPLOY_ENV", "test")
-SUPERVISOR_USERS = [u.strip() for u in os.getenv("SUPERVISOR_USERS", "").split(",") if u.strip()]
-ALLOWED_EDITOR_IPS = [ip.strip() for ip in os.getenv("ALLOWED_EDITOR_IPS", "").split(",") if ip.strip()]
-DEV_ALLOW_LOCAL_EDITOR = os.getenv("DEV_ALLOW_LOCAL_EDITOR", "1") == "1"
+# DEPLOY_ENV removed per request
+# DEPLOY_ENV = os.getenv("DEPLOY_ENV", "test")
+# SUPERVISOR_USERS removed per request
+# SUPERVISOR_USERS = ...
+# ALLOWED_EDITOR_IPS removed per request (2026/1/1修改)
+# DEV_ALLOW_LOCAL_EDITOR removed per request
+# DEV_ALLOW_LOCAL_EDITOR = ...
 
 # === 注意事項（operation / bonding）讀寫 ===
 DEFAULT_NOTES = {
@@ -51,20 +55,7 @@ DEFAULT_NOTES = {
     "bonding": "（預設）這裡放 bonding 注意事項的說明，供主管編輯…"
 }
 
-def get_client_ip(request: Request) -> str:
-    """
-    從 X-Forwarded-For / X-Real-IP（在 nginx 設定）或 fallback 到 request.client.host 取得來源 IP
-    """
-    if TRUST_PROXY:
-        xff = request.headers.get("x-forwarded-for")
-        if xff:
-            # 取最前面那個（最接近客戶端）
-            return xff.split(",")[0].strip()
-        xri = request.headers.get("x-real-ip")
-        if xri:
-            return xri.strip()
-    # 沒代理或沒標頭時
-    return (request.client.host if request.client else "") or ""
+# get_client_ip function removed per request (2026/1/1修改)
 
 def is_editor(request: Request) -> bool:
     """
@@ -74,15 +65,22 @@ def is_editor(request: Request) -> bool:
     2) 來源 IP 在 ALLOWED_EDITOR_IPS → 通過
     3) 本機/開發測試：DEV_ALLOW_LOCAL_EDITOR=1 且 IP 為 127.0.0.1 / ::1 → 通過
     """
-    ip = get_client_ip(request)
+    # ip = get_client_ip(request)  <- removed
     user = request.headers.get("X-Remote-User") or request.headers.get("Remote-User")
 
-    if user and SUPERVISOR_USERS and user in SUPERVISOR_USERS:
-        return True
-    if ip and ALLOWED_EDITOR_IPS and ip in ALLOWED_EDITOR_IPS:
-        return True
-    if DEV_ALLOW_LOCAL_EDITOR and ip in ("127.0.0.1", "::1"):
-        return True
+    # SUPERVISOR_USERS check removed per request (2026/1/1修改)
+    
+    
+    # Legacy IP/Supervisor checks removed (2026/1/1修改)
+    # 這是最準確判定「是否為這台機器」的方法，不受 Docker 網路影響
+    chk_hostname = os.getenv("ALLOWED_HOSTNAME")
+    if chk_hostname:
+        current_node = platform.node()
+        # 不分大小寫比對
+        if current_node and current_node.upper() == chk_hostname.upper():
+            return True
+
+    # DEV_ALLOW_LOCAL_EDITOR check removed (2026/1/1修改)
     return False
 
 @app.get("/me")
@@ -90,12 +88,13 @@ async def me(request: Request):
     """
     回傳前端需要的身分資訊，讓前端決定是否開啟編輯 UI
     """
-    ip = get_client_ip(request)
+    # ip = get_client_ip(request) <- removed
     user = request.headers.get("X-Remote-User") or request.headers.get("Remote-User")
     return JSONResponse({
-        "client_ip": ip,
         "user": user,
-        "env": DEPLOY_ENV,
+        # "env": DEPLOY_ENV, <- removed
+        # ★ 新增：回傳 Hostname 供前端顯示 (2026/1/1修改)
+        "hostname": platform.node(),
         "is_editor": is_editor(request)
     })
 
@@ -755,3 +754,37 @@ async def save_notices(
     os.replace(tmp_path, NOTICES_FILE)
 
     return JSONResponse({"ok": True})
+
+# === 新增：自定義規則 API ===
+RULES_FILE = os.path.join(BASE_DIR, "validation_rules.json")
+
+@app.get("/api/rules")
+async def get_rules():
+    """讀取當前驗證規則"""
+    if not os.path.exists(RULES_FILE):
+        return JSONResponse({"rules": [], "forbidden_pins": []})
+    try:
+        with open(RULES_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            return JSONResponse(data)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+@app.post("/api/rules")
+async def save_rules(request: Request):
+    """儲存驗證規則 (僅限編輯者)"""
+    if not is_editor(request):
+        return JSONResponse({"error": "Forbidden"}, status_code=403)
+    
+    try:
+        data = await request.json()
+        # 原子寫入
+        tmp_path = RULES_FILE + ".tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp_path, RULES_FILE)
+        return JSONResponse({"ok": True})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
