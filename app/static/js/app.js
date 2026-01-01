@@ -107,10 +107,42 @@ async function checkEditor() {
     const rulesBtn = document.getElementById("openRulesBtn");
     if (rulesBtn) rulesBtn.hidden = !IS_EDITOR;
 
+
   } catch (err) {
     console.warn("[checkEditor] failed:", err);
     IS_EDITOR = false; // 安全預設
   }
+}
+
+// ★ 2026/1/2修改：判斷鋁線/金線 Helper
+// 規則：CUP為[no msg]或是空 & PadWindow >= 65X65 就是鋁線，其他為金線
+function judgeWireType(padWindowStr, cupStr) {
+  const c = (cupStr || "").trim().toLowerCase();
+  const isCupEmpty = (!c || c === "[no msg]");
+
+  // 解析 PadWindow 尺寸 (預期格式如 "70um x 70um", "90X90", "100" 等)
+  // 這裡簡單抓取字串中的數字
+  const nums = (padWindowStr || "").match(/(\d+(\.\d+)?)/g);
+  let w = 0, h = 0;
+  if (nums && nums.length >= 2) {
+    w = parseFloat(nums[0]);
+    h = parseFloat(nums[1]);
+  } else if (nums && nums.length === 1) {
+    // 若只有一個數字，假設是正方形? 或者當作無法判斷? 
+    // 假設 user 說 "65X65"，通常會有兩個數字。若只寫 "90"，保險起見當作 90x90 或 90x? 
+    // 依照 "65X65" 描述，應至少有兩數。若不足兩數，視為未達標 (或視情況而定)。
+    // 這裡嚴謹一點，若抓不到兩個數字，視為 0x0
+    w = parseFloat(nums[0]);
+    h = w; // 假設正方形? 先保守處理，若不足兩數可能有誤，這裡暫且假設是正方形
+  }
+
+  // 判斷 >= 65x65 -> 寬 >= 65 且 高 >= 65
+  const isLargePad = (w >= 65 && h >= 65);
+
+  if (isCupEmpty && isLargePad) {
+    return "鋁線";
+  }
+  return "金線";
 }
 
 // === 注意事項：預設值（沒有檔案時用） ===
@@ -251,6 +283,8 @@ const invalidEl = document.getElementById("invalidPins");
 const projectCodeEl = document.getElementById("projectCode");
 const padwindowEl = document.getElementById("padwindow");   // ★ 新增
 const cupEl = document.getElementById("cup");         // ★ 新增
+const wireTypeEl = document.getElementById("wireType"); // ★ 新增：Wire Type 獨立膠囊
+
 
 const chipWidthEl = document.getElementById("chipWidth");
 const chipHeightEl = document.getElementById("chipHeight");
@@ -605,6 +639,7 @@ function clearImageAndState() {
   projectCodeEl.textContent = "";  // projectCode 資訊
   padwindowEl.textContent = "";  // padwindow 資訊
   cupEl.textContent = "";  // cup 資訊
+  if (wireTypeEl) wireTypeEl.textContent = ""; // ★ 清空 Wire Type
   hideDataControls();
   hideLoadBtn(); // 註解：清畫面時一併把「載入資料」按鈕隱藏，避免殘留
 }
@@ -1673,11 +1708,23 @@ async function querySheetInfo() {
 
   // ★ 新增：把 PadWindow / CUP 寫進膠囊
   if (data.extras) {
-    padwindowEl.textContent = data.extras.PadWindow || "";
-    cupEl.textContent = data.extras.CUP || "[no msg]";
+    const rawPw = data.extras.PadWindow || "";
+    const rawCup = data.extras.CUP || "";
+
+    // ★ 2026/1/2修改：判斷鋁線/金線邏輯
+    // 規則：CUP為[no msg]或是空 & PadWindow >= 65X65 就是鋁線，其他為金線
+    const wireType = judgeWireType(rawPw, rawCup);
+
+    padwindowEl.textContent = rawPw;
+    // 顯示 CUP 原始值
+    cupEl.textContent = rawCup || "[no msg]";
+
+    // ★ 2026/1/2修改：將判斷結果顯示在獨立的 Wire Type 膠囊
+    if (wireTypeEl) wireTypeEl.textContent = wireType;
   } else {
     padwindowEl.textContent = "";
     cupEl.textContent = "";
+    if (wireTypeEl) wireTypeEl.textContent = "";
   }
 
 
