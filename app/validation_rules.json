@@ -1,0 +1,99 @@
+{
+  "rules": [
+    {
+      "id": "rule_x9ydhmta3",
+      "pins": [
+        "87"
+      ],
+      "allowed_patterns": [
+        "^VDDP$"
+      ],
+      "color": "pink",
+      "description": "VDDP Check (Pin 87)"
+    },
+    {
+      "id": "rule_oa50caen2",
+      "pins": [
+        "92",
+        "41"
+      ],
+      "allowed_patterns": [
+        "^VDDPST$"
+      ],
+      "color": "pink",
+      "description": "VDDPST Check"
+    },
+    {
+      "id": "rule_xicah9mkg",
+      "pins": [
+        "17",
+        "18",
+        "19",
+        "22",
+        "56",
+        "57",
+        "58",
+        "59"
+      ],
+      "allowed_patterns": [
+        "^Q\\[?[0-7]\\]?$"
+      ],
+      "color": "blue",
+      "description": "Q-Pin Check (Q0-Q7)"
+    },
+    {
+      "id": "rule_ja580e5lc",
+      "pins": [
+        "11",
+        "40",
+        "60"
+      ],
+      "allowed_patterns": [
+        "VSS",
+        "VSSPST"
+      ],
+      "color": "green",
+      "description": "VSS Check"
+    },
+    {
+      "id": "rule_oxcc1dtzi",
+      "pins": [
+        "9"
+      ],
+      "allowed_patterns": [
+        "^VDD$"
+      ],
+      "color": "pink",
+      "description": "VDD Check (Pin 9)"
+    },
+    {
+      "id": "rule_x36v5u6ws",
+      "pins": [
+        "61"
+      ],
+      "allowed_patterns": [
+        "^VDD_?IP$"
+      ],
+      "color": "pink",
+      "description": "VDDIP Check (Pin 61)"
+    }
+  ],
+  "forbidden_pins": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "I",
+    "J",
+    "K",
+    "L",
+    "M",
+    "N",
+    "O",
+    "P"
+  ]
+}
