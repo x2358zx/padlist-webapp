@@ -719,9 +719,11 @@ function imgRect() {
 }
 
 // === Ring detection (內/外圈自動辨識) ===
-// 使用十分位/九十分位當作"外/內"代表值，較不受極端值影響
-const RING_Q_OUTER = 0.10;
-const RING_Q_INNER = 0.90;
+// Ring detection (內/外圈自動辨識)
+// 2026/1/1修改: 使用 0.0/1.0 (Min/Max) 作為外/內層判定，確保抓到最外與最內邊界
+const RING_Q_OUTER = 0.0; // 2026/1/1修改
+const RING_Q_INNER = 1.0; // 2026/1/1修改
+const GEO_EPS = 0.5;      // 2026/1/1修改: 幾何判定容許誤差
 
 // === Ring color mapping：以使用者選色為基底，內圈=偏亮、外圈=偏暗 ===
 // 將兩個 hex 顏色依權重混合（w ∈ [0,1]）
@@ -778,21 +780,55 @@ function quantile(sorted, q) {
   return sorted[i];
 }
 
+
+// 回傳四邊 rails：left/right 用 x 值，top/bottom 用 y 值
+// 新增輔助函式：計算全域邊界 (2026/1/1修改)
+function computeGlobalBounds(points) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  points.forEach(pt => {
+    if (pt.x < minX) minX = pt.x;
+    if (pt.x > maxX) maxX = pt.x;
+    if (pt.y < minY) minY = pt.y;
+    if (pt.y > maxY) maxY = pt.y;
+  });
+  return { minX, maxX, minY, maxY };
+}
+
+// 新增輔助函式：幾何分類判定 Side (2026/1/1修改)
+function getGeometricSide(pt, bounds) {
+  const { minX, maxX, minY, maxY } = bounds;
+  const dL = Math.abs(pt.x - minX);
+  const dR = Math.abs(maxX - pt.x);
+  const dT = Math.abs(pt.y - minY);
+  const dB = Math.abs(maxY - pt.y);
+  const minD = Math.min(dL, dR, dT, dB);
+
+  if (dL <= minD + GEO_EPS) return "left";
+  if (dR <= minD + GEO_EPS) return "right";
+  if (dT <= minD + GEO_EPS) return "top";
+  if (dB <= minD + GEO_EPS) return "bottom";
+  return null;
+}
+
 // 回傳四邊 rails：left/right 用 x 值，top/bottom 用 y 值
 function computeRingRails(chipW, chipH) {
+  // 1. 蒐集所有有效點的 Stage 座標
+  const points = [];
+  (VALID_PINS || []).forEach(p => {
+    const pt = chipToStage(p.x, p.y, chipW, chipH);
+    if (pt) points.push(pt);
+  });
+  if (!points.length) return null;
+
+  // 2. 計算全域邊界 (2026/1/1修改: 改用 helper)
+  const bounds = computeGlobalBounds(points);
+
   const acc = { left: [], right: [], top: [], bottom: [] };
 
-  // 依 pin 所在的 side（看其對應的 label 盒子的 class）把座標丟進去
-  (VALID_PINS || []).forEach(p => {
-    const box = inputsByLabel.get(p.pin_no) || inputsByLabelNorm.get(normLabel(p.pin_no));
-    if (!box) return;
-    const pt = chipToStage(p.x, p.y, chipW, chipH); // stage 座標
-    if (!pt) return;
-
-    if (box.classList.contains("side-left")) acc.left.push(pt.x);
-    else if (box.classList.contains("side-right")) acc.right.push(pt.x);
-    else if (box.classList.contains("side-top")) acc.top.push(pt.y);
-    else if (box.classList.contains("side-bottom")) acc.bottom.push(pt.y);
+  // 3. 幾何分類：將每個點分配給距離最近的邊 (2026/1/1修改: 改用 helper)
+  points.forEach(pt => {
+    const side = getGeometricSide(pt, bounds);
+    if (side && acc[side]) acc[side].push(side === "left" || side === "right" ? pt.x : pt.y);
   });
 
   // 轉成分位數（先排序）
@@ -801,19 +837,21 @@ function computeRingRails(chipW, chipH) {
   const T = acc.top.sort(sortAsc), B = acc.bottom.sort(sortAsc);
 
   // === 改用「雙中位數」來抓兩條軌道（更抗離群值，也不會把下側抬高） ===
-  function median(arr) { const n = arr.length; if (!n) return null; const m = Math.floor(n / 2); return n % 2 ? arr[m] : (arr[m - 1] + arr[m]) / 2; }
+  // 2026/1/1修改: 移除中位數與 splitMedians 邏輯，簡化為 Min/Max
+  /* function median(arr)... function splitMedians(sorted)... (已移除) */
   function splitMedians(sorted) {
     if (sorted.length < 2) return { low: null, high: null };
     const mid = Math.floor(sorted.length / 2);
     return { low: median(sorted.slice(0, mid)), high: median(sorted.slice(mid)) };
   }
-  const mL = splitMedians(L), mR = splitMedians(R), mT = splitMedians(T), mB = splitMedians(B);
+  // (分位數計算: Outer=0.0, Inner=1.0)
   // 規則：left/top 內圈=較靠中心（left: x 大、top: y 大）；right/bottom 內圈=較靠中心（right: x 小、bottom: y 小[舞台座標]）
+  // 2026/1/1修改: 改用 Min/Max 判定 rails 座標
   const rails = {
-    left: { outer: mL.low ?? quantile(L, RING_Q_OUTER), inner: mL.high ?? quantile(L, RING_Q_INNER) },
-    right: { outer: mR.high ?? quantile(R, 1 - RING_Q_OUTER), inner: mR.low ?? quantile(R, RING_Q_OUTER) },
-    top: { outer: mT.low ?? quantile(T, RING_Q_OUTER), inner: mT.high ?? quantile(T, RING_Q_INNER) },
-    bottom: { outer: mB.high ?? quantile(B, 1 - RING_Q_OUTER), inner: mB.low ?? quantile(B, RING_Q_OUTER) },
+    left: { outer: quantile(L, RING_Q_OUTER), inner: quantile(L, RING_Q_INNER) },
+    right: { outer: quantile(R, 1 - RING_Q_OUTER), inner: quantile(R, RING_Q_OUTER) },
+    top: { outer: quantile(T, RING_Q_OUTER), inner: quantile(T, RING_Q_INNER) },
+    bottom: { outer: quantile(B, 1 - RING_Q_OUTER), inner: quantile(B, RING_Q_OUTER) },
   };
 
   // 任一邊缺資料就視為無法分圈
@@ -1269,6 +1307,16 @@ function drawPinsAndLines() {
   const chipW = Number(chipWidthEl.value), chipH = Number(chipHeightEl.value);
   if (!chipW || !chipH || !MIN_POINT || !MAX_POINT) return;
 
+  // 新增：計算全域邊界供繪圖迴圈使用 (2026/1/1修改: 改用 helper)
+  const allPoints = [];
+  (VALID_PINS || []).forEach(p => {
+    const pt = chipToStage(p.x, p.y, chipW, chipH);
+    if (pt) allPoints.push(pt);
+  });
+  // 需有 bounds 才能做後續幾何分類
+  const bounds = allPoints.length ? computeGlobalBounds(allPoints) : null;
+
+
   // ① 計算內/外圈 rails + 兩個方形框
   const rails = computeRingRails(chipW, chipH);
   const rects = rails ? buildRingRects(rails) : null;
@@ -1290,11 +1338,17 @@ function drawPinsAndLines() {
 
     // ② 依圈別決定顏色（unknown 則維持預設色）
     const boxEl = inputsByLabel.get(p.pin_no) || inputsByLabelNorm.get(normLabel(p.pin_no));
-    const side = boxEl ? getBoxSide(boxEl) : null;
+
+    // 2026/1/1修改: 改用幾何位置判定 Side (Helper)
+    let geoSide = null;
+    if (bounds) {
+      geoSide = getGeometricSide(pt, bounds);
+    }
+
     let ring = "unknown";
-    if (rects && side && hasTwoRings(rails)) {
-      const axisVal = (side === "left" || side === "right") ? pt.x : pt.y;
-      ring = decideRing(side, axisVal, rails);
+    if (rects && geoSide && hasTwoRings(rails)) {
+      const axisVal = (geoSide === "left" || geoSide === "right") ? pt.x : pt.y;
+      ring = decideRing(geoSide, axisVal, rails);
     }
     // 以「使用者選色」為基底：內圈偏亮、外圈偏暗；unknown 就用原色
     const color = ringColor(PIN_STYLE_COLOR, ring);
